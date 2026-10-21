@@ -33,20 +33,20 @@ This guide is **binding for every PR or commit**. Prettier and ESLint enforce me
 
 ## 2. Naming
 
-| Item | Convention | Example |
-|---|---|---|
-| Files | `kebab-case` | `auth.service.ts`, `repo-url.ts` |
-| Directories | `kebab-case`, feature names single-worded when possible | `auth/`, `submissions/`, `review/` |
-| Types / interfaces / enums | `PascalCase`; no `I` prefix | `CreateSubmissionInput` |
-| Enum values | `UPPER_SNAKE_CASE` | `SubmissionStatus.APPROVED` |
-| Functions / variables | `camelCase`; action-verb prefix | `createSubmission`, `listMySubmissions`, `normalizeRepoUrl` |
-| Controllers | named per HTTP intent | `create`, `list`, `updateStatus`, `stats` |
-| Boolean variables | `is/has/can` prefix | `isReviewed`, `canTransition` |
-| Constants | `UPPER_SNAKE_CASE` | `DEFAULT_PAGE_SIZE` |
-| Zod schemas | camelCase + `Schema` suffix | `loginSchema`, `listSubmissionsQuerySchema` |
-| Schemas’ inferred types | PascalCase + `*Input` (write) / `*Query` (list/read) | `SignupInput`, `UpdateStatusInput`, `ListSubmissionsQuery` |
-| API routes | lowercase, plural nouns; verbs only on PATCH action suffixes | `/api/submissions`, `/api/mentor/submissions/:id/status` |
-| Env variables | `UPPER_SNAKE_CASE` | `JWT_EXPIRES_IN` |
+| Item                       | Convention                                                   | Example                                                     |
+| -------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| Files                      | `kebab-case`                                                 | `auth.service.ts`, `repo-url.ts`                            |
+| Directories                | `kebab-case`, feature names single-worded when possible      | `auth/`, `submissions/`, `review/`                          |
+| Types / interfaces / enums | `PascalCase`; no `I` prefix                                  | `CreateSubmissionInput`                                     |
+| Enum values                | `UPPER_SNAKE_CASE`                                           | `SubmissionStatus.APPROVED`                                 |
+| Functions / variables      | `camelCase`; action-verb prefix                              | `createSubmission`, `listMySubmissions`, `normalizeRepoUrl` |
+| Controllers                | named per HTTP intent                                        | `create`, `list`, `updateStatus`, `stats`                   |
+| Boolean variables          | `is/has/can` prefix                                          | `isReviewed`, `canTransition`                               |
+| Constants                  | `UPPER_SNAKE_CASE`                                           | `DEFAULT_PAGE_SIZE`                                         |
+| Zod schemas                | camelCase + `Schema` suffix                                  | `loginSchema`, `listSubmissionsQuerySchema`                 |
+| Schemas’ inferred types    | PascalCase + `*Input` (write) / `*Query` (list/read)         | `SignupInput`, `UpdateStatusInput`, `ListSubmissionsQuery`  |
+| API routes                 | lowercase, plural nouns; verbs only on PATCH action suffixes | `/api/submissions`, `/api/mentor/submissions/:id/status`    |
+| Env variables              | `UPPER_SNAKE_CASE`                                           | `JWT_EXPIRES_IN`                                            |
 
 ---
 
@@ -93,11 +93,11 @@ This guide is **binding for every PR or commit**. Prettier and ESLint enforce me
 
 Responsibility map (from `implementation-plan.md` §3):
 
-| Layer file | May do | Must not |
-|---|---|---|
-| `*.routes.ts` | compose the middleware chain; bind controller | contain business logic, access Prisma |
-| `*.controller.ts` | parse request types, call **one** service, shape `res` | touch Prisma, hold business rules, `throw` business errors |
-| `*.service.ts` | business decisions, `throw new ApiError`, **the only Prisma importer per feature** | call `res.*`, read `req.*` internals (dependency-injected into the service instead) |
+| Layer file        | May do                                                                             | Must not                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `*.routes.ts`     | compose the middleware chain; bind controller                                      | contain business logic, access Prisma                                               |
+| `*.controller.ts` | parse request types, call **one** service, shape `res`                             | touch Prisma, hold business rules, `throw` business errors                          |
+| `*.service.ts`    | business decisions, `throw new ApiError`, **the only Prisma importer per feature** | call `res.*`, read `req.*` internals (dependency-injected into the service instead) |
 
 Concrete rules:
 
@@ -139,13 +139,13 @@ import { readFile } from 'node:fs/promises';
 
 // 2. External packages
 import type { Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
 // 3. Internal aliases
 import { prisma } from '@/db/prisma';
 import { authenticate } from '@/middlewares/authenticate';
+import { Prisma } from '@/generated/prisma/client';
 
 // 4. Same-feature relative
 import { submissionService } from './submission.service';
@@ -183,23 +183,24 @@ import { submissionService } from './submission.service';
 ## 9. HTTP Conventions
 
 **Response shapes:**
+
 - Success: `{ success: true, data: <payload> }`
 - Failure: `{ success: false, message: <string>, code?: <ApiErrorCode>, details?: [...] }`
 
 **Status codes as public API semantics** (see `implementation-plan.md` §5.3 for full table):
 
-| Code | Meaning in this codebase |
-|---|---|
-| 200 | Success |
-| 201 | Resource created (`signup`, new submission) |
-| 400 | Zod validation failure |
-| 401 | Unauthenticated (missing/expired/invalid token, or bad login) |
-| 403 | Forbidden role (`ROLE_FORBIDDEN`) |
-| 404 | Submission not found |
-| 409 | Duplicate (`DUPLICATE_SUBMISSION`, duplicate email) |
-| 422 | `INVALID_STATUS_TRANSITION` (already-reviewed item) |
-| 429 | Rate limit (always from `rate-limiter` middleware, never hand-thrown) |
-| 500 | Genuine fault; never hand-thrown for business errors |
+| Code | Meaning in this codebase                                              |
+| ---- | --------------------------------------------------------------------- |
+| 200  | Success                                                               |
+| 201  | Resource created (`signup`, new submission)                           |
+| 400  | Zod validation failure                                                |
+| 401  | Unauthenticated (missing/expired/invalid token, or bad login)         |
+| 403  | Forbidden role (`ROLE_FORBIDDEN`)                                     |
+| 404  | Submission not found                                                  |
+| 409  | Duplicate (`DUPLICATE_SUBMISSION`, duplicate email)                   |
+| 422  | `INVALID_STATUS_TRANSITION` (already-reviewed item)                   |
+| 429  | Rate limit (always from `rate-limiter` middleware, never hand-thrown) |
+| 500  | Genuine fault; never hand-thrown for business errors                  |
 
 - Error messages must be **human-readable at the API boundary** in clear, domain-specific language ("You have already submitted a project with this repository URL.").
 - They must never leak stack traces, SQL, or internal identifiers to callers.
@@ -208,18 +209,22 @@ import { submissionService } from './submission.service';
 
 ## 10. Prisma Conventions
 
+- **Prisma 7 layout:** the client is generated into `src/generated/prisma` (git-ignored) by the `prisma-client` generator. Import types and the client from `@/generated/prisma/client` — never from `@prisma/client`.
+- The connection lives in two places, and nowhere else: `prisma.config.ts` (CLI: migrate/db/studio) and `db/prisma.ts` (runtime: `new PrismaClient({ adapter: new PrismaPg({ connectionString }) })`).
+- The **only** Prisma import in feature code is inside `features/*` service files and `db/prisma.ts`.
 - `@@map("snake_case_table")` in Prisma ↔ `camelCase` in TS.
-- The only Prisma import is inside `features/*` service files and `db/prisma.ts`.
 - Always select Prisma transactions for a request which spans several updates (as in the review status-update + optional feedback pairing).
 - Read models are narrowed with a `select` clause; every query leverages the indexes defined in `implementation-plan.md` §4 (`status+createdAt`, `studentId+createdAt`).
 - Defaults: use `@default(cuid())` for ids, `@default(now())` and `@updatedAt` for timestamps.
 - Schema changes go through `prisma migrate dev --name <us_name_snake_case>`; never `db push` on shared branch work.
+- After any schema edit run `npm run prisma:generate` (the `postinstall` hook does it automatically) so the generated client and the app types stay in sync.
 
 ---
 
 ## 11. Environment & Configuration
 
 - `process.env` is read **only inside `config/env.ts`** — all other modules import `env`.
+- The one sanctioned exception: `prisma.config.ts` (the Prisma CLI config, outside the app runtime) reads `process.env.DATABASE_URL` directly, because the CLI loads it before any app module exists.
 - `config/env.ts` validates in keys with a Zod schema at boot and fails loudly for missing required vars.
 - `.env` must never be committed; `.env.example` is kept up to date whenever `env.ts` changes.
 - Adding a variable follows this strict order: `env.ts` schema → `.env.example` with clear docs → local `.env` in PR description if needed for ops.
@@ -231,7 +236,7 @@ import { submissionService } from './submission.service';
 - Comments explain **why**, never **what**. If `what` is unclear, rename code.
 - Every **exported service function** gets a short JSDoc with `@param` semantics and **which `ApiError`s it throws**:
 
-  ````ts
+  ```ts
   /**
    * Creates a submission and enforces the documented duplicate rule
    * (one repo URL per student, normalized before comparison).
@@ -242,8 +247,10 @@ import { submissionService } from './submission.service';
   export async function createSubmission(
     studentId: string,
     input: CreateSubmissionInput,
-  ): Promise<Submission> { /* … */ }
-  ````
+  ): Promise<Submission> {
+    /* … */
+  }
+  ```
 
 - TODOs read `// TODO(2026-10-21): reason and ticket` and get an owner; block progress otherwise.
 

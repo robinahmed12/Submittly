@@ -3,13 +3,13 @@
 > Companion doc: [coding-style.md](./coding-style.md)
 > Requirements source: [../../Docs/submittly_project_requirements.md](../../Docs/submittly_project_requirements.md)
 
-| | |
-|---|---|
-| Architecture | Feature-based (vertical slices) |
-| Stack | Node.js + TypeScript, Express 5, Prisma ORM, PostgreSQL |
-| Auth | JWT (Bearer) + role-based access control |
-| Validation | Zod (server-side, always) |
-| Status | Planned — build starts at Phase 1 |
+|              |                                                         |
+| ------------ | ------------------------------------------------------- |
+| Architecture | Feature-based (vertical slices)                         |
+| Stack        | Node.js + TypeScript, Express 5, Prisma ORM 7, PostgreSQL |
+| Auth         | JWT (Bearer) + role-based access control                |
+| Validation   | Zod (server-side, always)                               |
+| Status       | Planned — build starts at Phase 1                       |
 
 ---
 
@@ -28,36 +28,43 @@ Non-negotiable rules that shape this plan:
 
 ## 2. Tech Stack & Dependencies
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Runtime | Node.js 20+ | |
-| Framework | Express 5 | Built-in promise rejection handling (no need for `express-async-errors`) |
-| Language | TypeScript 5, `strict: true, exactOptionalPropertyTypes: true` | |
-| ORM | Prisma + PostgreSQL | Single Postgres instance via `DATABASE_URL` |
-| Validation | Zod 4 | Schemas are the single source of truth for inputs and types |
-| Auth | `jsonwebtoken`, `bcryptjs` | Access token in `Authorization: Bearer`; 12 salt rounds |
-| HTTP hardening | `helmet`, `cors`, `express-rate-limit` | |
-| Dev tooling | `tsx`, ESLint (typescript-eslint), Prettier | `tsx watch src/server.ts` for dev |
+| Layer          | Choice                                                         | Notes                                                                    |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Runtime        | Node.js 20+                                                    |                                                                          |
+| Framework      | Express 5                                                      | Built-in promise rejection handling (no need for `express-async-errors`) |
+| Language       | TypeScript 5, `strict: true, exactOptionalPropertyTypes: true` |                                                                          |
+| ORM            | Prisma 7 + PostgreSQL                                       | `prisma-client` generator + `@prisma/adapter-pg` driver adapter; URL in `prisma.config.ts` |
+| Validation     | Zod 4                                                          | Schemas are the single source of truth for inputs and types              |
+| Auth           | `jsonwebtoken`, `bcryptjs`                                     | Access token in `Authorization: Bearer`; 12 salt rounds                  |
+| HTTP hardening | `helmet`, `cors`, `express-rate-limit`                         |                                                                          |
+| Dev tooling    | `tsx`, ESLint (typescript-eslint), Prettier                    | `tsx watch src/server.ts` for dev                                        |
 
 **Install**
 
 ```bash
-npm i express@^5 @prisma/client zod jsonwebtoken bcryptjs express-rate-limit cors helmet dotenv
-npm i -D typescript tsx prisma @types/express @types/jsonwebtoken @types/bcryptjs @types/cors @types/node eslint prettier typescript-eslint
+npm i express@^5 @prisma/client@^7 @prisma/adapter-pg pg zod@^4 jsonwebtoken@^9 bcryptjs@^3 express-rate-limit@^8 cors@^2 helmet@^8 dotenv@^17
+npm i -D typescript tsx prisma@^7 @types/pg @types/express @types/jsonwebtoken @types/cors @types/node eslint @eslint/js typescript-eslint prettier tsc-alias
 ```
+
+> Note: `bcryptjs@^3` ships its own type definitions — no `@types/bcryptjs` needed.
+> `tsc-alias` rewrites `@/` path aliases in the compiled CommonJS output.
 
 **`package.json` scripts**
 
 ```json
 {
   "dev": "tsx watch src/server.ts",
-  "build": "tsc -p tsconfig.json",
+  "build": "prisma generate && tsc -p tsconfig.json && tsc-alias",
   "start": "node dist/server.js",
+  "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+  "lint": "eslint .",
+  "format": "prettier --write .",
+  "postinstall": "prisma generate",
   "prisma:generate": "prisma generate",
   "prisma:migrate": "prisma migrate dev",
+  "prisma:deploy": "prisma migrate deploy",
   "prisma:seed": "prisma db seed",
-  "lint": "eslint src",
-  "format": "prettier --write ."
+  "prisma:studio": "prisma studio"
 }
 ```
 
@@ -67,18 +74,24 @@ npm i -D typescript tsx prisma @types/express @types/jsonwebtoken @types/bcryptj
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    // CommonJS emit keeps `node dist/server.js` runnable with zero loader
+    // config; `@/` aliases resolve via tsx in dev and tsc-alias at build.
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
+    "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] },
+    "rootDir": "src",
     "outDir": "dist",
+    "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/types/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
 ```
 
@@ -111,26 +124,30 @@ Server-side/
 │   └── coding-style.md
 ├── prisma/
 │   ├── schema.prisma
-│   └── seed.ts                  # seeds ADMIN from env
+│   ├── migrations/                # committed migration history
+│   └── seed.ts                    # seeds ADMIN from env
+├── prisma.config.ts               # Prisma 7 CLI config: schema path, seed cmd, datasource URL
 ├── src/
-│   ├── server.ts                # bootstrap: env check → app → listen (kept separate for tests)
-│   ├── app.ts                   # Express app factory: middleware chain + router mount
+│   ├── server.ts                  # bootstrap: env check → app → listen (kept separate for tests)
+│   ├── app.ts                     # Express app factory: middleware chain + router mount
 │   ├── config/
-│   │   └── env.ts               # Zod-validated env; ONLY process.env access point
+│   │   └── env.ts                 # Zod-validated env; ONLY process.env access point
 │   ├── db/
-│   │   └── prisma.ts            # PrismaClient singleton
-│   ├── lib/                     # framework-agnostic helpers (shared)
-│   │   ├── errors.ts            # ApiError + error codes
-│   │   ├── jwt.ts               # sign / verify access tokens
-│   │   ├── password.ts          # hash / compare (bcryptjs)
-│   │   └── repo-url.ts          # repo URL normalization (duplicate rule)
-│   ├── middlewares/             # shared cross-feature middleware
-│   │   ├── authenticate.ts      # Bearer verify → req.user
-│   │   ├── authorize.ts         # authorize('MENTOR') role guard
-│   │   ├── validate.ts          # Zod parse middleware (body/query/params)
-│   │   ├── rate-limiter.ts      # named limiters: global / auth / submit
-│   │   ├── error-handler.ts     # central ApiError → JSON
-│   │   └── not-found.ts         # 404 for unmatched /api routes
+│   │   └── prisma.ts              # PrismaClient singleton (pg driver adapter)
+│   ├── generated/
+│   │   └── prisma/                # Prisma 7 generated client (git-ignored, `npm run prisma:generate`)
+│   ├── lib/                       # framework-agnostic helpers (shared)
+│   │   ├── errors.ts              # ApiError + error codes
+│   │   ├── jwt.ts                 # sign / verify access tokens
+│   │   ├── password.ts            # hash / compare (bcryptjs)
+│   │   └── repo-url.ts            # repo URL normalization (duplicate rule)
+│   ├── middlewares/               # shared cross-feature middleware
+│   │   ├── authenticate.ts        # Bearer verify → req.user
+│   │   ├── authorize.ts           # authorize('MENTOR') role guard
+│   │   ├── validate.ts            # Zod parse middleware (body/query/params)
+│   │   ├── rate-limiter.ts        # named limiters: global / auth / submit
+│   │   ├── error-handler.ts       # central ApiError → JSON
+│   │   └── not-found.ts           # 404 for unmatched /api routes
 │   ├── features/
 │   │   ├── auth/
 │   │   │   ├── auth.routes.ts
@@ -148,10 +165,11 @@ Server-side/
 │   │       ├── review.service.ts
 │   │       └── review.schema.ts
 │   └── types/
-│       ├── express.d.ts         # Request.user augmentation
-│       └── http.ts              # success envelope typing
+│       ├── express.d.ts           # Request.user augmentation
+│       ├── role.ts                # Role / SubmissionStatus re-exported from the generated client
+│       └── http.ts                # success envelope typing
 ├── .env.example
-├── .gitignore                   # includes .env
+├── .gitignore                     # includes .env
 ├── package.json
 └── tsconfig.json
 ```
@@ -167,18 +185,19 @@ shared/* → features/*                                    forbidden
 
 ---
 
-## 4. Prisma Schema
+## 4. Prisma Schema (Prisma 7)
 
-`prisma/schema.prisma`:
+`prisma/schema.prisma` — note the v7 changes: the `prisma-client` generator with an
+`output` path, and **no `url` in the datasource** (it moved to `prisma.config.ts`):
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -242,15 +261,23 @@ model Feedback {
 }
 ```
 
+**Connection setup (Prisma 7)**
+
+| Where | How |
+| --- | --- |
+| CLI (migrate / db / studio) | `prisma.config.ts` → `datasource.url: process.env.DATABASE_URL` (the schema no longer holds the URL) |
+| Runtime (the app) | `src/db/prisma.ts` → `new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) })` |
+| Client code | `import { PrismaClient } from '@/generated/prisma/client'` — generated into `src/generated/prisma` (git-ignored, regenerated by `npm run prisma:generate` / `postinstall`) |
+
 Schema decisions:
 
-| Decision | Detail |
-|---|---|
-| Duplicate rule | `@@unique([studentId, repoUrl])` — one repo URL per student (the documented rule required by §4.2). Uses the **normalized** repo URL, so P2002 violations surface a clean `409 DUPLICATE_SUBMISSION`. |
-| Normalized storage | `repoUrl` is stored post-normalization (see §6.2) so the unique index is meaningful. |
-| `liveUrl` optional | Not every project has a deployment; uniqueness is intentionally not applied to it. |
-| Stat-optimized index | `@@index([status, createdAt])` serves filtered + paginated dashboard queries and the stats `COUNT`s. |
-| Access log | `@@index([studentId, createdAt])` serves the "my submissions" list. |
+| Decision             | Detail                                                                                                                                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Duplicate rule       | `@@unique([studentId, repoUrl])` — one repo URL per student (the documented rule required by §4.2). Uses the **normalized** repo URL, so P2002 violations surface a clean `409 DUPLICATE_SUBMISSION`. |
+| Normalized storage   | `repoUrl` is stored post-normalization (see §6.2) so the unique index is meaningful.                                                                                                                  |
+| `liveUrl` optional   | Not every project has a deployment; uniqueness is intentionally not applied to it.                                                                                                                    |
+| Stat-optimized index | `@@index([status, createdAt])` serves filtered + paginated dashboard queries and the stats `COUNT`s.                                                                                                  |
+| Access log           | `@@index([studentId, createdAt])` serves the "my submissions" list.                                                                                                                                   |
 
 ---
 
@@ -260,22 +287,24 @@ Schema decisions:
 
 Single point that reads `process.env`, validates it with Zod at startup, and exports a typed `env`. Fails fast at boot for missing required variables.
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `DATABASE_URL` | yes | PostgreSQL connection string |
-| `PORT` | no (default 4000) | HTTP listen port |
-| `JWT_SECRET` | yes | HMAC secret, ≥ 32 chars enforced in code |
-| `JWT_EXPIRES_IN` | no (default `7d`) | Access-token TTL |
-| `BCRYPT_SALT_ROUNDS` | no (default 12) | Hash cost |
-| `CORS_ORIGIN` | yes | Exact allowed origin, e.g. `http://localhost:3000` |
-| `RATE_LIMIT_AUTH_MAX` | no (default 10) | Login/signup attempts per window |
-| `RATE_LIMIT_SUBMIT_MAX` | no (default 5) | Submissions per window |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seed only | Credentials for the seeded admin |
-| `NODE_ENV` | no (default `development`) | |
+| Variable                         | Required                   | Purpose                                            |
+| -------------------------------- | -------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                   | yes                        | PostgreSQL connection string                       |
+| `PORT`                           | no (default 4000)          | HTTP listen port                                   |
+| `JWT_SECRET`                     | yes                        | HMAC secret, ≥ 32 chars enforced in code           |
+| `JWT_EXPIRES_IN`                 | no (default `7d`)          | Access-token TTL                                   |
+| `BCRYPT_SALT_ROUNDS`             | no (default 12)            | Hash cost                                          |
+| `CORS_ORIGIN`                    | yes                        | Exact allowed origin, e.g. `http://localhost:3000` |
+| `RATE_LIMIT_AUTH_MAX`            | no (default 10)            | Login/signup attempts per window                   |
+| `RATE_LIMIT_SUBMIT_MAX`          | no (default 5)             | Submissions per window                             |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seed only                  | Credentials for the seeded admin                   |
+| `NODE_ENV`                       | no (default `development`) |                                                    |
 
 ### 5.2 `db/prisma.ts`
 
-Singleton `new PrismaClient()` exported once; imported by services. (Dev nicety: record-query logging.)
+Singleton `PrismaClient` exported once; imported by services. Prisma 7 constructs the
+client with the `pg` driver adapter (`new PrismaPg({ connectionString })`) and the
+generated client is imported from `@/generated/prisma/client`. (Dev nicety: record-query logging.)
 
 ### 5.3 `lib/errors.ts`
 
@@ -292,7 +321,11 @@ export type ApiErrorCode =
   | 'INTERNAL';
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string, readonly code: ApiErrorCode) {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly code: ApiErrorCode,
+  ) {
     super(message);
   }
 }
@@ -300,32 +333,32 @@ export class ApiError extends Error {
 
 Every service failure that the client should see is `throw new ApiError(...)`; the central error handler renders it. Mapping used throughout:
 
-| Status | When | Typical code |
-|---|---|---|
-| 400 | Zod validation failure | `VALIDATION_ERROR` |
-| 401 | Missing / expired / malformed token | `AUTH_REQUIRED` / `AUTH_INVALID` |
-| 403 | Role lacks permission (student on mentor route) | `ROLE_FORBIDDEN` |
-| 404 | Submission not found | `NOT_FOUND` |
-| 409 | Duplicate submission rule violated | `DUPLICATE_SUBMISSION` |
-| 422 | Not accepting `PENDING → APPROVED/REJECTED` on an already-reviewed item | `INVALID_STATUS_TRANSITION` |
-| 429 | Rate limit tripped | `RATE_LIMITED` |
-| 500 | Unhandled failure (server-side only) | `INTERNAL` |
+| Status | When                                                                    | Typical code                     |
+| ------ | ----------------------------------------------------------------------- | -------------------------------- |
+| 400    | Zod validation failure                                                  | `VALIDATION_ERROR`               |
+| 401    | Missing / expired / malformed token                                     | `AUTH_REQUIRED` / `AUTH_INVALID` |
+| 403    | Role lacks permission (student on mentor route)                         | `ROLE_FORBIDDEN`                 |
+| 404    | Submission not found                                                    | `NOT_FOUND`                      |
+| 409    | Duplicate submission rule violated                                      | `DUPLICATE_SUBMISSION`           |
+| 422    | Not accepting `PENDING → APPROVED/REJECTED` on an already-reviewed item | `INVALID_STATUS_TRANSITION`      |
+| 429    | Rate limit tripped                                                      | `RATE_LIMITED`                   |
+| 500    | Unhandled failure (server-side only)                                    | `INTERNAL`                       |
 
 ### 5.4 Middlewares (precise contracts)
 
-| Middleware | Contract |
-|---|---|
-| `authenticate` | Expects `Authorization: Bearer <token>`. Verifies **signature and expiry**; attaches `req.user = { id, role }`. 401 on missing/invalid/expired token. |
-| `authorize(...roles: Role[])` | After `authenticate`; 403 unless `req.user.role ∈ roles`. |
+| Middleware                             | Contract                                                                                                                                                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authenticate`                         | Expects `Authorization: Bearer <token>`. Verifies **signature and expiry**; attaches `req.user = { id, role }`. 401 on missing/invalid/expired token.                                                            |
+| `authorize(...roles: Role[])`          | After `authenticate`; 403 unless `req.user.role ∈ roles`.                                                                                                                                                        |
 | `validate({ body?, query?, params? })` | Parses with Zod, **strips unknown keys**, replaces `req.body/query/params` with parsed values. On failure → 400 with `details: [{ path, message }]`. Pagination schemas use `z.coerce` for numeric query params. |
-| `rate-limiter` | Named factory instances: `globalLimiter` (app-wide, generous), `authLimiter` (login/signup), `submitLimiter` (submission creation). Keyed by IP or authenticated `user.id` when present. |
-| `error-handler` | Renders `ApiError`; safety-maps `ZodError → 400` and Prisma `P2002 → 409` (defense in depth); anything else → 500 `INTERNAL` with a generic message (details logged server-side only). |
-| `not-found` | Unmatched `/api/**` → 404 envelope. |
+| `rate-limiter`                         | Named factory instances: `globalLimiter` (app-wide, generous), `authLimiter` (login/signup), `submitLimiter` (submission creation). Keyed by IP or authenticated `user.id` when present.                         |
+| `error-handler`                        | Renders `ApiError`; safety-maps `ZodError → 400` and Prisma `P2002 → 409` (defense in depth); anything else → 500 `INTERNAL` with a generic message (details logged server-side only).                           |
+| `not-found`                            | Unmatched `/api/**` → 404 envelope.                                                                                                                                                                              |
 
 ### 5.5 `types/express.d.ts`
 
 ```ts
-import type { Role } from '@/types/role'; // mirrored Prisma enum literals
+import type { Role } from '@/types/role'; // re-exported from the generated Prisma client
 
 export interface AuthenticatedUser {
   id: string;
@@ -351,12 +384,13 @@ Assignment `req.user = { id, role }` happens **only** inside `authenticate`.
 
 **Endpoints (mounted at `/api/auth`):**
 
-| Method | Route | Access | Purpose |
-|---|---|---|---|
-| POST | `/signup` | public | Student registration |
-| POST | `/login` | public | Login (any role) |
+| Method | Route     | Access | Purpose              |
+| ------ | --------- | ------ | -------------------- |
+| POST   | `/signup` | public | Student registration |
+| POST   | `/login`  | public | Login (any role)     |
 
 **`signup` flow (service):**
+
 1. Validate with `signupSchema` (`name`, `email`, `password` — min 8, letter+number required).
 2. Normalize email: trim + lowercase.
 3. **Register only `Role.STUDENT`** — mentor/admin roles are never client-suppliable.
@@ -373,6 +407,7 @@ Request / success response:
 ```
 
 **`login` flow (service):**
+
 1. Validate `loginSchema` (`email`, `password`).
 2. Lookup user by normalized email; compare bcrypt hash.
 3. Invalid credentials → **401** with generic message; no user-existence disclosure.
@@ -384,12 +419,13 @@ Request / success response:
 
 **Endpoints (mounted at `/api/submissions`):**
 
-| Method | Route | Access | Purpose |
-|---|---|---|---|
-| POST | `/` | `STUDENT` | Create submission |
-| GET | `/me` | `STUDENT` | List own submissions |
+| Method | Route | Access    | Purpose              |
+| ------ | ----- | --------- | -------------------- |
+| POST   | `/`   | `STUDENT` | Create submission    |
+| GET    | `/me` | `STUDENT` | List own submissions |
 
 **Create flow (service):**
+
 1. `validate(createSubmissionSchema)`:
    - `projectName` 3–120 chars
    - `repoUrl` must be a valid URL
@@ -417,7 +453,11 @@ Request → success:
 409 example (documented response):
 
 ```json
-{ "success": false, "message": "You have already submitted a project with this repository URL.", "code": "DUPLICATE_SUBMISSION" }
+{
+  "success": false,
+  "message": "You have already submitted a project with this repository URL.",
+  "code": "DUPLICATE_SUBMISSION"
+}
 ```
 
 **List my submissions:** returns newest first, scoped by `req.user.id` from the token; shape `{ items: Submission[], total }`.
@@ -428,11 +468,11 @@ Request → success:
 
 **Endpoints (mounted at `/api/mentor`):**
 
-| Method | Route | Access | Purpose |
-|---|---|---|---|
-| GET | `/submissions` | `MENTOR`, `ADMIN` | Paginated list with server-side status filter |
-| PATCH | `/submissions/:id/status` | `MENTOR`, `ADMIN` | Approve / reject a submission |
-| GET | `/stats` | `MENTOR`, `ADMIN` | Aggregate statistics |
+| Method | Route                     | Access            | Purpose                                       |
+| ------ | ------------------------- | ----------------- | --------------------------------------------- |
+| GET    | `/submissions`            | `MENTOR`, `ADMIN` | Paginated list with server-side status filter |
+| PATCH  | `/submissions/:id/status` | `MENTOR`, `ADMIN` | Approve / reject a submission                 |
+| GET    | `/stats`                  | `MENTOR`, `ADMIN` | Aggregate statistics                          |
 
 **Paginated list (service):** `page` (default 1), `limit` (default 10, max 50), `status` (`PENDING|APPROVED|REJECTED`, optional).
 
@@ -441,7 +481,16 @@ Request → success:
 {
   "success": true,
   "data": {
-    "items": [ { "id": "…", "projectName": "…", "repoUrl": "…", "status": "APPROVED", "student": { "name": "…", "email": "…" }, "createdAt": "…" } ],
+    "items": [
+      {
+        "id": "…",
+        "projectName": "…",
+        "repoUrl": "…",
+        "status": "APPROVED",
+        "student": { "name": "…", "email": "…" },
+        "createdAt": "…"
+      }
+    ],
     "page": 2,
     "limit": 10,
     "total": 27,
@@ -469,7 +518,10 @@ Request → success:
 
 ```json
 // GET /api/mentor/stats
-{ "success": true, "data": { "stats": { "total": 120, "pending": 43, "approved": 68, "rejected": 9 } } }
+{
+  "success": true,
+  "data": { "stats": { "total": 120, "pending": 43, "approved": 68, "rejected": 9 } }
+}
 ```
 
 Exceeds the minimum bar by including `rejected`; `total` = sum of all three.
@@ -497,16 +549,16 @@ Sample error with validation details:
 
 Route summary:
 
-| Method | Route | Access | Feature |
-|---|---|---|---|
-| GET | `/api/health` | public | infra |
-| POST | `/api/auth/signup` | public | auth |
-| POST | `/api/auth/login` | public | auth |
-| POST | `/api/submissions` | STUDENT | submissions |
-| GET | `/api/submissions/me` | STUDENT | submissions |
-| GET | `/api/mentor/submissions` | MENTOR, ADMIN | review |
-| PATCH | `/api/mentor/submissions/:id/status` | MENTOR, ADMIN | review |
-| GET | `/api/mentor/stats` | MENTOR, ADMIN | review |
+| Method | Route                                | Access        | Feature     |
+| ------ | ------------------------------------ | ------------- | ----------- |
+| GET    | `/api/health`                        | public        | infra       |
+| POST   | `/api/auth/signup`                   | public        | auth        |
+| POST   | `/api/auth/login`                    | public        | auth        |
+| POST   | `/api/submissions`                   | STUDENT       | submissions |
+| GET    | `/api/submissions/me`                | STUDENT       | submissions |
+| GET    | `/api/mentor/submissions`            | MENTOR, ADMIN | review      |
+| PATCH  | `/api/mentor/submissions/:id/status` | MENTOR, ADMIN | review      |
+| GET    | `/api/mentor/stats`                  | MENTOR, ADMIN | review      |
 
 **App mounting** (a feature exports a barrel):
 
@@ -535,64 +587,73 @@ router.post(
 
 ## 8. Security & Reliability Checklist
 
-| Requirement (§6) | Implementation in this plan |
-|---|---|
-| Server-side validation for all data | Zod `validate` middleware on every mutating / filtered route |
-| Normalize + validate emails | Trim + lowercase in auth service; `z.string().toLowerCase()` in schema |
-| Password hashing, never plaintext | `bcryptjs` (12 rounds) |
-| JWT signature + expiration verified | `authenticate` middleware on all protected routes |
-| Permissions enforced on server | `authorize` role guards; no client-reported role |
-| Access verified per submission | Update via `id` +404; student scoping by `req.user.id` |
-| Duplicate prevention with documented rule | `(studentId, normalized repoUrl)` composite unique → 409 |
-| Rate limiting on auth + submissions | `authLimiter`, `submitLimiter` (configurable via env) |
-| Correct HTTP status codes + clear errors | Global status/error-code table (§5.3) |
-| Secrets in env, `.env` never committed | `env.ts` validation + `.env.example` + `.gitignore` |
-| Loading/empty/error states on the client | Backend guarantees consistent envelopes that make these states deterministic |
+| Requirement (§6)                          | Implementation in this plan                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| Server-side validation for all data       | Zod `validate` middleware on every mutating / filtered route                 |
+| Normalize + validate emails               | Trim + lowercase in auth service; `z.string().toLowerCase()` in schema       |
+| Password hashing, never plaintext         | `bcryptjs` (12 rounds)                                                       |
+| JWT signature + expiration verified       | `authenticate` middleware on all protected routes                            |
+| Permissions enforced on server            | `authorize` role guards; no client-reported role                             |
+| Access verified per submission            | Update via `id` +404; student scoping by `req.user.id`                       |
+| Duplicate prevention with documented rule | `(studentId, normalized repoUrl)` composite unique → 409                     |
+| Rate limiting on auth + submissions       | `authLimiter`, `submitLimiter` (configurable via env)                        |
+| Correct HTTP status codes + clear errors  | Global status/error-code table (§5.3)                                        |
+| Secrets in env, `.env` never committed    | `env.ts` validation + `.env.example` + `.gitignore`                          |
+| Loading/empty/error states on the client  | Backend guarantees consistent envelopes that make these states deterministic |
 
 ---
 
 ## 9. Build Phases
 
 ### Outlet 1 — Project Setup
-- [ ] `npm init`, install runtime + dev deps, Express 5
-- [ ] `tsconfig.json` with `strict: true, exactOptionalPropertyTypes: true`; `@/` path aliases
-- [ ] ESLint (typescript-eslint) + Prettier; `.gitignore` (env + dist)
-- [ ] `src/server.ts` + `src/app.ts` skeleton; `GET /api/health`
-- [ ] `.env.example` with every variable documented
+
+- [x] `npm init`, install runtime + dev deps, Express 5
+- [x] `tsconfig.json` with `strict: true, exactOptionalPropertyTypes: true`; `@/` path aliases
+- [x] ESLint (typescript-eslint) + Prettier; `.gitignore` (env + dist)
+- [x] `src/server.ts` + `src/app.ts` skeleton; `GET /api/health`
+- [x] `.env.example` with every variable documented
 
 ### Outlet 2 — Schema & shared infrastructure
-- [ ] Prisma schema modelled + indexes per §4
-- [ ] `prisma migrate dev --name init_submittly`
-- [ ] `db/prisma.ts`; `config/env.ts`; `types/express.d.ts` (`req.user`)
-- [ ] `lib/` (`errors.ts`, `password.ts`, `jwt.ts`, `repo-url.ts`)
-- [ ] `middlewares/` (`authenticate`, `authorize`, `validate`, `rate-limiter`, `error-handler`, `not-found`)
-- [ ] `app.ts` composing middleware chain exactly in order (json → helmet → cors → globalLimiter → routes → notFound → errorHandler)
+
+- [x] Prisma schema modelled + indexes per §4 (Prisma 7 `prisma-client` generator)
+- [x] `prisma.config.ts` (CLI config: schema path, seed command, datasource URL)
+- [x] `db/prisma.ts` (PrismaClient + pg adapter); `config/env.ts`; `types/express.d.ts` (`req.user`)
+- [x] `lib/` (`errors.ts`, `password.ts`, `jwt.ts`, `repo-url.ts`)
+- [x] `middlewares/` (`authenticate`, `authorize`, `validate`, `rate-limiter`, `error-handler`, `not-found`)
+- [x] `app.ts` composing middleware chain exactly in order (json → helmet → cors → globalLimiter → routes → notFound → errorHandler)
+- [ ] `prisma migrate dev --name init_submittly` — ⏸ blocked: no PostgreSQL instance reachable yet (see §11)
+- [x] `prisma db seed` script written (`prisma/seed.ts`) — ⏸ run pending the migration
 
 ### Outlet 3 — Feature: `auth`
+
 - [ ] `auth.schema.ts` (signup, login + inferred types)
 - [ ] `auth.service.ts` (bcrypt, 409 email, 401 generic login failure, STUDENT-only signup)
 - [ ] `auth.controller.ts`, `auth.routes.ts` with `authLimiter`
 - [ ] Smoke: `curl` signup/login → 201/200; bad password → 401
 
 ### Outlet 4 — Feature: `submissions`
+
 - [ ] `submission.schema.ts`; `repo-url.ts` normalization
 - [ ] `submission.service.ts` (create with 409 P2002 mapping; list via `req.user.id`)
 - [ ] Routes wired `authenticate → authorize('STUDENT') → submitLimiter → validate`
 - [ ] Smoke: create → 201; duplicate → 409; mentor token on route → 403
 
 ### Outlet 5 — Feature: `review`
+
 - [ ] `review.schema.ts` (list query, status patch)
 - [ ] `review.service.ts` (paginated server-filtered list, 422-barred transitions, transactional update + comment, `GROUP BY` stats)
 - [ ] Routes wired `authenticate → authorize('MENTOR','ADMIN') → validate`
 - [ ] Smoke: filter + page flags; approve one submission; stats reflect it
 
 ### Outlet 6 — Hardening, seeding & clean-up
+
 - [ ] `prisma/seed.ts` creating ADMIN from `ADMIN_EMAIL`/`ADMIN_PASSWORD` (always `prisma db seed`)
 - [ ] Final error-shape audit (each route maps to the envelope contract)
 - [ ] README update: setup, env docs, endpoint list, curl examples
 - [ ] ESLint/Prettier clean; TS `strict` compiles with no errors
 
 ### Outlet 7 — Testing & acceptance
+
 - [ ] Jest + Supertest setup (app factory opens without `listen`)
 - [ ] Map each item of `Requirements §10 Testing Checklist` to a test case
 - [ ] Positive/negative/auth/rate-limit suites for every feature
@@ -603,13 +664,13 @@ router.post(
 
 ## 10. Open Decisions Log
 
-| # | Area | Decision | Notes |
-|---|---|---|---|
-| 1 | Duplicate rule | Unique `(studentId, normalized repoUrl)` | Required doc decision in `Requirements §4.2` |
-| 2 | Re-review | `PENDING → APPROVED/REJECTED` only; a completed review cannot be mutated by the same endpoint (422) | Prevents accidental overrides |
-| 3 | `liveUrl` | Optional | No uniqueness on it |
-| 4 | Signup roles | Students only self-register | Mentors/admin created by seed (allowed per `Requirements §3`) |
-| 5 | Feedback | Optional `comment` can accompany approve/reject; plain review allowed without comment | |
-| 6 | Stats surface | `total`, `pending`, `approved`, `rejected` | Superset of the required minimum |
-| 7 | Pagination | `page` ≥ 1, `limit` 5–50 (default 10) via `z.coerce` | |
-| 8 | Auth response envelope | `{ user, token }` returned on signup and login | |
+| #   | Area                   | Decision                                                                                            | Notes                                                         |
+| --- | ---------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1   | Duplicate rule         | Unique `(studentId, normalized repoUrl)`                                                            | Required doc decision in `Requirements §4.2`                  |
+| 2   | Re-review              | `PENDING → APPROVED/REJECTED` only; a completed review cannot be mutated by the same endpoint (422) | Prevents accidental overrides                                 |
+| 3   | `liveUrl`              | Optional                                                                                            | No uniqueness on it                                           |
+| 4   | Signup roles           | Students only self-register                                                                         | Mentors/admin created by seed (allowed per `Requirements §3`) |
+| 5   | Feedback               | Optional `comment` can accompany approve/reject; plain review allowed without comment               |                                                               |
+| 6   | Stats surface          | `total`, `pending`, `approved`, `rejected`                                                          | Superset of the required minimum                              |
+| 7   | Pagination             | `page` ≥ 1, `limit` 5–50 (default 10) via `z.coerce`                                                |                                                               |
+| 8   | Auth response envelope | `{ user, token }` returned on signup and login                                                      |                                                               |

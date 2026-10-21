@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Prisma generated client (recreated by `npm run prisma:generate`)
+src/generated/
+
+# Secrets - never commit
+.env
+.env.local
+.env.*.local
+
+# Logs & misc
+*.log
+npm-debug.log*

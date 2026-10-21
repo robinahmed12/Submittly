@@ -1,0 +1,77 @@
+// Submittly — Prisma schema (Prisma ORM v7)
+// See docs/implementation-plan.md §4 for the decisions behind this model.
+
+generator client {
+	provider = "prisma-client"
+	// Generated client lives inside src/ so it compiles with the app and is
+	// importable through the `@/` alias.
+	output = "../src/generated/prisma"
+}
+
+datasource db {
+	provider = "postgresql"
+	// Connection URL lives in prisma.config.ts (CLI) and the driver adapter
+	// (runtime) — Prisma 7 removed `url` from the schema.
+}
+
+enum Role {
+	STUDENT
+	MENTOR
+	ADMIN
+}
+
+enum SubmissionStatus {
+	PENDING
+	APPROVED
+	REJECTED
+}
+
+model User {
+	id           String   @id @default(cuid())
+	name         String
+	email        String   @unique
+	passwordHash String
+	role         Role     @default(STUDENT)
+	createdAt    DateTime @default(now())
+	updatedAt    DateTime @updatedAt
+
+	submissions Submission[] @relation("StudentSubmissions")
+	feedbacks   Feedback[]
+
+	@@map("users")
+}
+
+model Submission {
+	id          String           @id @default(cuid())
+	studentId   String
+	student     User             @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
+	projectName String
+	repoUrl     String           @db.VarChar(2048)
+	liveUrl     String?          @db.VarChar(2048)
+	description String           @db.VarChar(4000)
+	status      SubmissionStatus @default(PENDING)
+	createdAt   DateTime         @default(now())
+	updatedAt   DateTime         @updatedAt
+
+	feedbacks Feedback[]
+
+	// Documented duplicate rule (Requirements §4.2): one repo URL per student.
+	// Comparison runs against the normalized repo URL.
+	@@unique([studentId, repoUrl], map: "student_repoUrl_unique")
+	@@index([status, createdAt])
+	@@index([studentId, createdAt])
+	@@map("submissions")
+}
+
+model Feedback {
+	id           String     @id @default(cuid())
+	submissionId String
+	submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+	mentorId     String
+	mentor       User       @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+	comment      String
+	createdAt    DateTime   @default(now())
+
+	@@index([submissionId])
+	@@map("feedback")
+}
