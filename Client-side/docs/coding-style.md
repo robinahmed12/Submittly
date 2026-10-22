@@ -184,6 +184,7 @@ A folder gains a new top-level file only when it earns it. Four small files beat
 
 - **TanStack Query owns all server state.** `useQuery` for reads, `useMutation` for writes.
 - **Never fetch in `useEffect`.** If you are writing `useEffect(() => { fetch(...) }, [])`, the wrong tool is in your hand.
+- **Every call goes through `src/lib/api-client.ts`.** Use `apiGet(path)`, `apiPost(path, body)`, and `apiPatch(path, body)` rather than hand-rolling `JSON.stringify` or calling `fetch` directly. `apiFetch` is the escape hatch for anything unusual.
 - **Query keys come from the feature's key factory** — never an inline string. Inline keys drift and silently break invalidation.
 
   ```ts
@@ -391,6 +392,12 @@ app/(mentor)  → features/student                          forbidden
 - Next.js exposes `process.env.NEXT_PUBLIC_*` at build time — a value changed after the build has no effect. Document this in `.env.example` when adding one.
 - `next.config.ts` holds only genuinely build-time configuration. Runtime configuration comes from the environment.
 
+### 12.1 Server-only code
+
+- **`src/lib/session-server.ts` is `import 'server-only'`.** It uses `cookies()` and must never be imported by a Client Component.
+- **`src/lib/session.ts` is framework-free** — cookie names, the `Session` type, and the parser. `src/proxy.ts` imports it, so it must not pull `next/headers` into the proxy bundle.
+- **Session cookies are httpOnly.** The JWT lives in `submittly_token` and is read only by the backend proxy route. Browser JavaScript must never be able to read or write it.
+
 ---
 
 ## 13. Comments & Documentation
@@ -466,7 +473,7 @@ Types: `feat | fix | refactor | docs | test | chore | perf`.
 ```text
 COMPONENT   Server by default; 'use client' only on interactive islands
 FILE        features/<feature>/{api,keys,schemas,types}.ts + components/ + hooks/
-FETCH       apiFetch('/path') — never raw fetch; never useEffect
+FETCH       apiGet/apiPost/apiPatch from @/lib/api-client — never raw fetch; never useEffect
 KEYS        <feature>Keys.factory(...) — never inline strings
 STATE       TanStack Query for server state; useState for local UI only
 VALIDATE    Zod + zodResolver; client validation is UX, server is truth

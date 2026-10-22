@@ -340,7 +340,8 @@ Client-side/
 │   ├── lib/
 │   │   ├── api-client.ts                    # fetch wrapper + ApiError (§5.2)
 │   │   ├── query-client.ts                  # QueryClient factory + defaults
-│   │   ├── session.ts                       # server-only cookie read/clear
+│   │   ├── session.ts                       # cookie names, Session type, parsing (framework-free)
+│   │   ├── session-server.ts                # server-only: getSession() / clearSession()
 │   │   └── utils.ts                         # cn()
 │   ├── providers/
 │   │   ├── query-provider.tsx
@@ -421,7 +422,9 @@ async function handler(request: NextRequest, { params }: BackendRoute): Promise<
   if (token) headers.set('authorization', `Bearer ${token}`);
 
   const method = request.method;
-  const body = method === 'GET' || method === 'HEAD' ? undefined : await request.text();
+  // `null`, not `undefined`: with `exactOptionalPropertyTypes` an explicit
+  // `undefined` is not assignable to `BodyInit | null`.
+  const body = method === 'GET' || method === 'HEAD' ? null : await request.text();
 
   let upstream: Response;
   try {
@@ -676,9 +679,19 @@ export class ApiError extends Error {
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/backend${path}`, {
     ...init,
-    headers: { accept: 'application/json', 'content-type': 'application/json', ...init?.headers },
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      ...init?.headers,
+    },
     credentials: 'same-origin',
   });
+
+  // A 401 means the token expired or was rejected. Tear the session down
+  // before throwing, so the caller never has to think about it.
+  if (response.status === 401) {
+    await endSession();
+  }
 
   const payload = (await response.json()) as ApiResponse<T>;
 
@@ -690,6 +703,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return payload.data;
 }
 ```
+
+Thin wrappers for the three verbs the app uses — `apiGet(path)`, `apiPost(path, body)`, `apiPatch(path, body)` — so callers never hand-roll `JSON.stringify`.
 
 **Error → message mapping.** The API's `message` is already human-readable and domain-specific ("You have already submitted a project with this repository URL."), so it is shown **verbatim**. The mapping below only adds a fallback for codes that arrive without a message:
 
@@ -706,6 +721,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 | `INTERNAL`                       | "Something went wrong on our end. Please try again."             |
 
 `401` is special-cased in `apiFetch`: it calls `DELETE /api/session` — the local route handler, which clears the cookies **server-side**, because browser JavaScript cannot delete an httpOnly cookie — and then redirects to `/login?next=<path>` before throwing.
+
+The redirect is a **hard navigation**, not a router push: the session is gone and the TanStack Query cache still holds the previous user's data, so a client-side transition would keep that cache. The destination is built with `new URL(..., window.location.origin)` so the intent is explicit and the `@next/next/no-location-assign-relative-destination` rule stays satisfied.
 
 ### 5.3 `src/providers/query-provider.tsx`
 
@@ -759,24 +776,43 @@ export function QueryProvider({ children }: { children: ReactNode }) {
 > Move the `defaultOptions` into `getQueryClient()` so the browser client gets
 > them too — the snippet above keeps them in one place for illustration.
 
-### 5.4 `src/lib/session.ts`
+### 5.4 Session helpers
 
-Server-only helpers. Marked `import 'server-only'` so they cannot be pulled into a client bundle.
+Split across two files, because `src/proxy.ts` needs the cookie names and the parser but must **not** pull `next/headers` into the proxy bundle.
+
+**`src/lib/session.ts`** — framework-free. Importable from the proxy, the route handlers, and client code.
+
+```ts
+import type { Role, Session } from '@/types/api';
+
+export const TOKEN_COOKIE = 'submittly_token';
+export const SESSION_COOKIE = 'submittly_session';
+
+export const sessionCookieOptions = {
+  httpOnly: true,
+  sameSite: 'lax',
+  path: '/',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 60 * 60 * 24 * 7, // matches the backend's JWT_EXPIRES_IN default
+} as const;
+
+export function parseSession(raw: string | undefined): Session | null;
+export function serializeSession(session: Session): string;
+```
+
+`parseSession` returns `null` for a missing, malformed, or unrecognised cookie rather than throwing — a corrupt cookie should log the user out, not crash the request.
+
+**`src/lib/session-server.ts`** — `import 'server-only'`, so it can never reach a client bundle.
 
 ```ts
 import 'server-only';
 import { cookies } from 'next/headers';
 
-export const TOKEN_COOKIE = 'submittly_token';
-export const SESSION_COOKIE = 'submittly_session';
-
-export async function getSession(): Promise<Session | null> {
-  /* read + JSON.parse the cookie */
-}
-export async function clearSession(): Promise<void> {
-  /* delete both cookies */
-}
+export async function getSession(): Promise<Session | null>;
+export async function clearSession(): Promise<void>;
 ```
+
+`cookies()` is async in Next.js 16 — always `await` it.
 
 ### 5.5 `src/components/shared/`
 
@@ -1182,15 +1218,22 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 
 ### Outlet 2 — Shared infrastructure
 
-- [ ] `src/types/api.ts` (§5.1) — envelopes, domain types, `ApiErrorCode`
-- [ ] `src/lib/api-client.ts` — `apiFetch` + `ApiError` + 401 handling (§5.2)
-- [ ] `src/lib/session.ts` — server-only cookie helpers (§5.4)
-- [ ] `src/lib/utils.ts` — `cn()`
-- [ ] `src/app/api/backend/[...path]/route.ts` — the proxy (§4.2)
-- [ ] `src/app/api/session/route.ts` — `DELETE` clears cookies
-- [ ] `src/providers/query-provider.tsx` (§5.3)
-- [ ] `src/proxy.ts` — role gate (§4.3)
-- [ ] Smoke: `GET /api/backend/health` returns the upstream envelope verbatim
+- [x] `src/types/api.ts` (§5.1) — envelopes, domain types, `ApiErrorCode`, `Session`
+- [x] `src/lib/api-client.ts` — `apiFetch` + `ApiError` + `getErrorMessage` + 401 handling (§5.2)
+- [x] `src/lib/session.ts` — cookie names, `Session` type, `parseSession`, cookie options (§5.4)
+- [x] `src/lib/session-server.ts` — server-only `getSession()` / `clearSession()` (§5.4)
+- [x] `src/lib/query-client.ts` — `createQueryClient()` factory + shared defaults (§5.3)
+- [x] `src/lib/utils.ts` — `cn()`
+- [x] `src/app/api/backend/[...path]/route.ts` — the proxy (§4.2)
+- [x] `src/app/api/session/route.ts` — `DELETE` clears cookies
+- [x] `src/providers/query-provider.tsx` (§5.3), wired into the root layout
+- [x] `src/proxy.ts` — role gate (§4.3)
+- [x] Smoke: `GET /api/backend/health` returns the upstream envelope verbatim
+- [x] Smoke: login sets both httpOnly cookies and **strips the token from the body**
+- [x] Smoke: an authenticated call through the proxy reaches the API with the Bearer header
+- [x] Smoke: the server still refuses a wrong role (`403 ROLE_FORBIDDEN`) — the client is not the authority
+- [x] Smoke: logout clears the cookies; the next call is `401 AUTH_REQUIRED`
+- [x] Smoke: `src/proxy.ts` redirects `/student/**` for a non-student, and signed-out users to `/login?next=…`
 
 ### Outlet 3 — Feature: `auth`
 
