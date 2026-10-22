@@ -44,26 +44,26 @@ export interface Submission {
 
 ## 2. Naming
 
-| Item                        | Convention                                                     | Example                                      |
-| --------------------------- | -------------------------------------------------------------- | -------------------------------------------- |
-| Files                       | `kebab-case`                                                   | `submission-form.tsx`, `status-badge.tsx`     |
-| Directories                 | `kebab-case`                                                   | `features/review/`, `components/shared/`      |
-| Components                  | `PascalCase`                                                   | `SubmissionForm`, `StatsCards`                |
-| Page files                  | `page.tsx` inside a route folder                               | `app/mentor/submissions/page.tsx`             |
-| Layout files                | `layout.tsx`                                                   | `app/(mentor)/mentor/layout.tsx`              |
-| Route handlers              | `route.ts`                                                     | `app/api/backend/[...path]/route.ts`          |
-| Hooks                       | `use` + PascalCase                                             | `useLogin`, `useMySubmissions`                |
-| Types / interfaces          | `PascalCase`; no `I` prefix                                   | `LoginInput`, `PaginatedSubmissions`          |
-| Enum / union values         | `UPPER_SNAKE_CASE`                                             | `PENDING`, `APPROVED`                         |
-| Functions / variables       | `camelCase`; action-verb prefix                                | `roleHome`, `formatDate`, `readSession`       |
-| Boolean variables           | `is/has/can` prefix                                            | `isPending`, `hasSession`, `canReview`        |
-| Constants                   | `UPPER_SNAKE_CASE`                                             | `TOKEN_COOKIE`, `DEFAULT_PAGE_SIZE`           |
-| Zod schemas                 | camelCase + `Schema` suffix                                    | `loginSchema`, `createSubmissionSchema`       |
-| Schemas' inferred types     | PascalCase + `*Input` (write) / `*Query` (read)                | `LoginInput`, `UpdateStatusInput`             |
-| Query-key factories         | `keys.ts` exporting a `<feature>Keys` object                   | `reviewKeys.submissionsList(params)`          |
-| API paths                   | lowercase, plural nouns                                        | `/auth/login`, `/mentor/submissions`          |
-| Env variables               | `UPPER_SNAKE_CASE`                                             | `API_URL`                                    |
-| CSS variables / tokens      | `--kebab-case`                                                 | `--color-muted-foreground`                    |
+| Item                    | Convention                                      | Example                                   |
+| ----------------------- | ----------------------------------------------- | ----------------------------------------- |
+| Files                   | `kebab-case`                                    | `submission-form.tsx`, `status-badge.tsx` |
+| Directories             | `kebab-case`                                    | `features/review/`, `components/shared/`  |
+| Components              | `PascalCase`                                    | `SubmissionForm`, `StatsCards`            |
+| Page files              | `page.tsx` inside a route folder                | `app/mentor/submissions/page.tsx`         |
+| Layout files            | `layout.tsx`                                    | `app/(mentor)/mentor/layout.tsx`          |
+| Route handlers          | `route.ts`                                      | `app/api/backend/[...path]/route.ts`      |
+| Hooks                   | `use` + PascalCase                              | `useLogin`, `useMySubmissions`            |
+| Types / interfaces      | `PascalCase`; no `I` prefix                     | `LoginInput`, `PaginatedSubmissions`      |
+| Enum / union values     | `UPPER_SNAKE_CASE`                              | `PENDING`, `APPROVED`                     |
+| Functions / variables   | `camelCase`; action-verb prefix                 | `roleHome`, `formatDate`, `readSession`   |
+| Boolean variables       | `is/has/can` prefix                             | `isPending`, `hasSession`, `canReview`    |
+| Constants               | `UPPER_SNAKE_CASE`                              | `TOKEN_COOKIE`, `DEFAULT_PAGE_SIZE`       |
+| Zod schemas             | camelCase + `Schema` suffix                     | `loginSchema`, `createSubmissionSchema`   |
+| Schemas' inferred types | PascalCase + `*Input` (write) / `*Query` (read) | `LoginInput`, `UpdateStatusInput`         |
+| Query-key factories     | `keys.ts` exporting a `<feature>Keys` object    | `reviewKeys.submissionsList(params)`      |
+| API paths               | lowercase, plural nouns                         | `/auth/login`, `/mentor/submissions`      |
+| Env variables           | `UPPER_SNAKE_CASE`                              | `API_URL`                                 |
+| CSS variables / tokens  | `--kebab-case`                                  | `--color-muted-foreground`                |
 
 ---
 
@@ -144,6 +144,24 @@ A folder gains a new top-level file only when it earns it. Four small files beat
   });
   ```
 
+- **Build forms from shadcn's `<Field>` family** — v4 removed the old `Form` component. Each control is a `<Controller>` inside a `<Field>`:
+
+  ```tsx
+  <Controller
+    name="repoUrl"
+    control={form.control}
+    render={({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor="repoUrl">Repository URL</FieldLabel>
+        <Input {...field} id="repoUrl" aria-invalid={fieldState.invalid} />
+        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+      </Field>
+    )}
+  />
+  ```
+
+  The rules that make it accessible: `data-invalid` on the `<Field>`, `aria-invalid` on the control, and `<FieldError>` for the message.
+
 - **Server-side `details[]` map onto fields by `path`.** The API returns `{ path, message }` pairs; use the `path` as the field name.
 
   ```tsx
@@ -158,7 +176,7 @@ A folder gains a new top-level file only when it earns it. Four small files beat
 
 - **A failed submit never clears the form.** The user's input is the most expensive thing on the screen.
 - Disable the submit button while the mutation is pending, and show a spinner. Never allow double submits.
-- Every input has a `<Label>` bound with `htmlFor`, and every error has `aria-describedby` pointing at the message.
+- Every input has a `<FieldLabel>` bound with `htmlFor`, and every error has `aria-describedby` pointing at the message.
 
 ---
 
@@ -221,7 +239,13 @@ Each route group gets an `error.tsx`:
 ```tsx
 'use client';
 
-export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   return (
     <ErrorState
       title="Something went wrong"
@@ -360,9 +384,9 @@ app/(mentor)  → features/student                          forbidden
 - `.env` must never be committed; `.env.example` documents every variable and is kept up to date.
 - Adding a variable follows this order: `.env.example` with clear docs → local `.env` → usage.
 
-  | Variable   | Required | Purpose                                       |
-  | ---------- | -------- | --------------------------------------------- |
-  | `API_URL`  | yes      | Base URL of the Express API, e.g. `http://localhost:4000` |
+  | Variable  | Required | Purpose                                                   |
+  | --------- | -------- | --------------------------------------------------------- |
+  | `API_URL` | yes      | Base URL of the Express API, e.g. `http://localhost:4000` |
 
 - Next.js exposes `process.env.NEXT_PUBLIC_*` at build time — a value changed after the build has no effect. Document this in `.env.example` when adding one.
 - `next.config.ts` holds only genuinely build-time configuration. Runtime configuration comes from the environment.
@@ -446,6 +470,7 @@ FETCH       apiFetch('/path') — never raw fetch; never useEffect
 KEYS        <feature>Keys.factory(...) — never inline strings
 STATE       TanStack Query for server state; useState for local UI only
 VALIDATE    Zod + zodResolver; client validation is UX, server is truth
+FORM        <Controller> inside <Field data-invalid>; aria-invalid on the control
 ERRORS      apiFetch throws ApiError; show error.message; never swallow
 STATES      every view: loading · empty · error · success
 STYLE       semantic tokens (bg-background); no raw colours; cn() to merge

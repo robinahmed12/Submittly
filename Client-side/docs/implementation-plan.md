@@ -18,45 +18,46 @@ The backend is already implemented and frozen (`Server-side/docs/implementation-
 
 ### 1.1 Design principles
 
-| Principle | Consequence in this codebase |
-| --- | --- |
+| Principle                                       | Consequence in this codebase                                                                                                                               |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The server is the only authority on permissions | Route gating in the client is **UX**. Every call is independently authorized by `authenticate` + `authorize`. Hiding a button is never a security control. |
-| The token never reaches browser JavaScript | httpOnly cookies + a server-side proxy route (§4). |
-| The browser only ever talks to the Next origin | CORS is never exercised by the app; `CORS_ORIGIN` on the backend is only needed for direct tools (Postman, curl). |
-| Server state lives in TanStack Query | No `useEffect` fetching. Explicit loading / empty / error states everywhere. |
-| Server Components by default | `'use client'` only on genuinely interactive islands. |
-| Client validation is UX, never security | Zod schemas mirror the server's rules; the server re-validates every input. |
-| Pagination and filtering are server-driven | `page`, `limit`, `status` are query-string state, so URLs are shareable and the back button works. |
+| The token never reaches browser JavaScript      | httpOnly cookies + a server-side proxy route (§4).                                                                                                         |
+| The browser only ever talks to the Next origin  | CORS is never exercised by the app; `CORS_ORIGIN` on the backend is only needed for direct tools (Postman, curl).                                          |
+| Server state lives in TanStack Query            | No `useEffect` fetching. Explicit loading / empty / error states everywhere.                                                                               |
+| Server Components by default                    | `'use client'` only on genuinely interactive islands.                                                                                                      |
+| Client validation is UX, never security         | Zod schemas mirror the server's rules; the server re-validates every input.                                                                                |
+| Pagination and filtering are server-driven      | `page`, `limit`, `status` are query-string state, so URLs are shareable and the back button works.                                                         |
 
 ### 1.2 Status
 
-| Item | State |
-| --- | --- |
-| Requirements | ✅ `Docs/submittly_project_requirements.md` |
-| Backend API | ✅ implemented; contract verified against source |
-| Frontend scaffold | ⬜ not started — `Client-side/` is empty |
-| This document | ✅ written |
+| Item              | State                                            |
+| ----------------- | ------------------------------------------------ |
+| Requirements      | ✅ `Docs/submittly_project_requirements.md`      |
+| Backend API       | ✅ implemented; contract verified against source |
+| Frontend scaffold | ⬜ not started — `Client-side/` is empty         |
+| This document     | ✅ written                                       |
 
 ---
 
 ## 2. Tech Stack & Dependencies
 
-| Layer | Choice | Notes |
-| --- | --- | --- |
-| Framework | **Next.js 16.4.2** (App Router) | `proxy.ts` replaces `middleware.ts` in v16 (§4.3) |
-| UI runtime | **React 19.3.1** | Server Components by default |
-| Language | **TypeScript 5.9.3** | `strict: true` + the extra flags from §2.3 |
-| Styling | **Tailwind CSS 4.3.3** | CSS-first config — **no `tailwind.config.js`** |
-| Components | **shadcn/ui** (CLI 4.22.1) | Copied into `src/components/ui` — *not* an npm dependency |
-| Forms | **react-hook-form 7.90.0** + `@hookform/resolvers` 6.0.0 | `zodResolver` |
-| Validation | **Zod 4.6.7** | Deliberately the **same version** as the server |
-| Server state | **TanStack Query 5.104.5** | Cache, invalidation, explicit states |
-| Icons | **lucide-react 1.61.0** | shadcn `iconLibrary: "lucide"` |
-| Toasts | **sonner 2.0.8** | Backs shadcn's `toast` component |
-| Theme | **next-themes 0.4.6** | Dark mode via the `class` strategy |
-| Utilities | `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.7.0 | `cn()` in `src/lib/utils.ts` |
-| Lint | `eslint` 10.13.0 + `eslint-config-next` 16.4.2 | Flat config; bundles `typescript-eslint` 8.72.0, `jsx-a11y`, `react-hooks` |
-| Format | `prettier` 3.9.10 + `prettier-plugin-tailwindcss` 0.8.1 | |
+| Layer        | Choice                                                                             | Notes                                                                      |
+| ------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Framework    | **Next.js 16.4.2** (App Router)                                                    | `proxy.ts` replaces `middleware.ts` in v16 (§4.3)                          |
+| UI runtime   | **React 19.3.1**                                                                   | Server Components by default                                               |
+| Language     | **TypeScript 5.9.3**                                                               | `strict: true` + the extra flags from §2.3                                 |
+| Styling      | **Tailwind CSS 4.3.3**                                                             | CSS-first config — **no `tailwind.config.js`**                             |
+| Components   | **shadcn/ui** (CLI 4.22.1)                                                         | Copied into `src/components/ui` — _not_ an npm dependency                  |
+| Primitives   | **`radix-ui` 1.8.1**                                                               | The unified Radix package shadcn v4 uses — not individual `@radix-ui/*`    |
+| Forms        | **react-hook-form 7.90.0** + `@hookform/resolvers` 6.0.0                           | `zodResolver`; paired with shadcn's `<Field>` primitives (§2.6)            |
+| Validation   | **Zod 4.6.7**                                                                      | Deliberately the **same version** as the server                            |
+| Server state | **TanStack Query 5.104.5**                                                         | Cache, invalidation, explicit states                                       |
+| Icons        | **lucide-react 1.61.0**                                                            | shadcn `iconLibrary: "lucide"`                                             |
+| Toasts       | **sonner 2.0.8**                                                                   | Backs shadcn's `toast` component                                           |
+| Theme        | **next-themes 0.4.6**                                                              | Dark mode via the `class` strategy                                         |
+| Utilities    | `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.7.0, `cn` 0.5.0 | `cn()` in `src/lib/utils.ts`                                               |
+| Lint         | `eslint` 10.13.0 + `eslint-config-next` 16.4.2                                     | Flat config; bundles `typescript-eslint` 8.72.0, `jsx-a11y`, `react-hooks` |
+| Format       | `prettier` 3.9.10 + `prettier-plugin-tailwindcss` 0.8.1                            |                                                                            |
 
 ### 2.1 Install
 
@@ -72,12 +73,20 @@ npm i @tanstack/react-query@^5 react-hook-form@^7 @hookform/resolvers@^6 zod@^4 
 npm i -D prettier prettier-plugin-tailwindcss
 
 # 4. shadcn/ui
-npx shadcn@latest init
-npx shadcn@latest add button card input label form table badge select dialog alert \
-  skeleton dropdown-menu separator pagination avatar tabs
+npx shadcn@latest init --base radix --preset nova
+npx shadcn@latest add button card input label textarea field input-group table badge \
+  select dialog alert skeleton dropdown-menu separator pagination avatar tabs
 ```
 
 `shadcn add` writes real source into `src/components/ui/` — **never edit those files by hand** (see `coding-style.md` §8).
+
+> **`@hookform/resolvers@6` peer conflict.** It declares an optional `effect@^4` peer that the `@typeschema` chain contradicts with `effect@^3`. The zod resolver does not use `effect` at all, so `package.json` pins the transitive package instead:
+>
+> ```json
+> "overrides": { "effect": "^3.6.8" }
+> ```
+>
+> Without the pin, `npm install` fails with `ERESOLVE`. Do not remove it, and do not "fix" it with `--legacy-peer-deps` — that disables peer checking for the whole project.
 
 ### 2.2 `package.json` scripts
 
@@ -88,12 +97,16 @@ npx shadcn@latest add button card input label form table badge select dialog ale
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   }
 }
 ```
+
+`next typegen` runs first because the global `PageProps` / `LayoutProps` / `RouteContext` type helpers (§4.2) are generated into `.next/types/`, which is git-ignored. Without it, `tsc --noEmit` fails on a fresh clone.
+
+> `next lint` was **removed** in Next.js 16 — linting runs through the ESLint CLI directly.
 
 ### 2.3 `tsconfig.json` essentials
 
@@ -116,13 +129,20 @@ npx shadcn@latest add button card input label form table badge select dialog ale
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"] },
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts",
+  ],
+  "exclude": ["node_modules"],
 }
 ```
 
@@ -130,10 +150,12 @@ npx shadcn@latest add button card input label form table badge select dialog ale
 
 ### 2.4 `components.json`
 
+Written by `shadcn init`. The v4 CLI names styles `<base>-<preset>`; this project uses the Radix base with the Nova preset.
+
 ```json
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "new-york",
+  "style": "radix-nova",
   "rsc": true,
   "tsx": true,
   "tailwind": {
@@ -144,13 +166,17 @@ npx shadcn@latest add button card input label form table badge select dialog ale
     "prefix": ""
   },
   "iconLibrary": "lucide",
+  "rtl": false,
   "aliases": {
     "components": "@/components",
+    "utils": "@/lib/utils",
     "ui": "@/components/ui",
     "lib": "@/lib",
-    "hooks": "@/hooks",
-    "utils": "@/lib/utils"
-  }
+    "hooks": "@/hooks"
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
 }
 ```
 
@@ -160,46 +186,53 @@ npx shadcn@latest add button card input label form table badge select dialog ale
 
 Tailwind v4 is configured in CSS. There is no `tailwind.config.js`; `components.json` therefore sets `"tailwind.config": ""`.
 
+`shadcn init` writes the file with the full token set — `:root` and `.dark` blocks holding the OKLCH values, an `@theme inline` block mapping them onto Tailwind's colour utilities, and an `@layer base` block applying the defaults. The generated theme is the baseline; **extend it with new tokens rather than hard-coding values in components**.
+
 ```css
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  /* …inverted counterparts… */
-}
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-ring: var(--ring);
-  --color-destructive: var(--destructive);
-  --radius-lg: 0.5rem;
-  --radius-md: 0.375rem;
+  /* …every semantic token… */
+  --radius-lg: var(--radius);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  /* …light values… */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  /* …dark values… */
 }
 ```
 
-`shadcn init` writes this file. Extend it with new tokens rather than hard-coding hex values in components.
+### 2.6 Form primitives — `<Field>`, not `<Form>`
+
+**shadcn/ui v4 removed the old `Form` component.** Forms are now built from the `<Field>` family plus react-hook-form's `<Controller>`:
+
+| Import from `@/components/ui/field` | Purpose                          |
+| ----------------------------------- | -------------------------------- |
+| `Field`                             | The wrapper for one control      |
+| `FieldLabel`                        | The `<label>`                    |
+| `FieldDescription`                  | Helper text                      |
+| `FieldError`                        | Validation message               |
+| `FieldGroup`                        | Vertical rhythm between fields   |
+| `FieldContent`                      | Label + description side by side |
+| `FieldSet` / `FieldLegend`          | Grouping for related fields      |
+| `FieldTitle` / `FieldSeparator`     | Titles and dividers              |
+
+`@/components/ui/input-group` adds `InputGroup`, `InputGroupAddon`, and `InputGroupText` — used for the character counter under the description field.
+
+The pattern is: `useForm` + `zodResolver` for state and validation, `<Controller>` for each control, `<Field data-invalid={fieldState.invalid}>` for the wrapper, and `aria-invalid` on the control itself.
 
 ---
 
@@ -347,10 +380,10 @@ The persona boundary is as hard as the feature boundary: the mentor shell must n
 
 Two httpOnly cookies. `httpOnly` means browser JavaScript cannot read them — which is the entire point.
 
-| Cookie | Value | Read by | Purpose |
-| --- | --- | --- | --- |
-| `submittly_token` | The JWT | **Proxy route only** | Attached as `Authorization: Bearer <token>` to every backend call |
-| `submittly_session` | JSON `{ id, name, email, role }` | `src/proxy.ts`, server components | Role-based navigation and rendering the signed-in user |
+| Cookie              | Value                            | Read by                           | Purpose                                                           |
+| ------------------- | -------------------------------- | --------------------------------- | ----------------------------------------------------------------- |
+| `submittly_token`   | The JWT                          | **Proxy route only**              | Attached as `Authorization: Bearer <token>` to every backend call |
+| `submittly_session` | JSON `{ id, name, email, role }` | `src/proxy.ts`, server components | Role-based navigation and rendering the signed-in user            |
 
 Attributes for both: `httpOnly: true`, `sameSite: 'lax'`, `path: '/'`, `secure: true` in production, `maxAge` matching the backend's `JWT_EXPIRES_IN` (7 days by default).
 
@@ -359,6 +392,8 @@ Attributes for both: `httpOnly: true`, `sameSite: 'lax'`, `path: '/'`, `secure: 
 ### 4.2 The proxy route
 
 `src/app/api/backend/[...path]/route.ts` is the **only** place that talks to the Express API. Everything the browser sends is prefixed `/api/backend/`.
+
+A Route Handler must export HTTP methods, so the shared logic lives in one function that each verb re-exports. (`proxy` is reserved for `src/proxy.ts` — §4.3 — and must not be used here.)
 
 ```ts
 import { NextResponse } from 'next/server';
@@ -370,10 +405,10 @@ const API_URL = process.env.API_URL; // server-only — never NEXT_PUBLIC_
 
 export const dynamic = 'force-dynamic';
 
-type RouteContext = { params: Promise<{ path: string[] }> };
+type BackendRoute = RouteContext<'/api/backend/[...path]'>;
 
-export async function proxy(request: NextRequest, { params }: RouteContext): Promise<Response> {
-  const { path } = await params; // Next 15+ — params is a Promise
+async function handler(request: NextRequest, { params }: BackendRoute): Promise<Response> {
+  const { path } = await params; // params is a Promise in Next 16
   const incoming = new URL(request.url);
   const target = new URL(`/api/${path.join('/')}`, API_URL);
   target.search = incoming.search;
@@ -426,19 +461,27 @@ export async function proxy(request: NextRequest, { params }: RouteContext): Pro
 
   return response;
 }
+
+export const GET = handler;
+export const POST = handler;
+export const PATCH = handler;
+export const PUT = handler;
+export const DELETE = handler;
 ```
+
+> **`RouteContext<'/api/backend/[...path]'>`** is a global type helper generated by `next typegen` into `.next/types/`. It types `params` for the route, so there is no hand-written `RouteContext` type. Run `npm run typecheck` (which runs `next typegen` first) after adding a new dynamic route.
 
 **Proxy contract (binding):**
 
-| Rule | Detail |
-| --- | --- |
-| The upstream body is passed through **verbatim** | The client never re-shapes an envelope. Success and error envelopes reach the browser exactly as the API produced them. |
-| The upstream **status code** is passed through | 400/401/403/404/409/422/429/500 all survive the hop. |
-| `Authorization` is added only when a token cookie exists | Anonymous calls (`/auth/login`, `/auth/signup`, `/health`) need no header. |
-| The request `content-type` is forwarded | The API parses JSON bodies. |
-| `GET`/`HEAD` send no body | Forwarding an empty body breaks some runtimes. |
-| The token is **stripped** from successful auth responses | It lives in the cookie, never in JS. |
-| Network failure → `502` with a synthesised envelope | One error shape for the client to handle. |
+| Rule                                                     | Detail                                                                                                                  |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| The upstream body is passed through **verbatim**         | The client never re-shapes an envelope. Success and error envelopes reach the browser exactly as the API produced them. |
+| The upstream **status code** is passed through           | 400/401/403/404/409/422/429/500 all survive the hop.                                                                    |
+| `Authorization` is added only when a token cookie exists | Anonymous calls (`/auth/login`, `/auth/signup`, `/health`) need no header.                                              |
+| The request `content-type` is forwarded                  | The API parses JSON bodies.                                                                                             |
+| `GET`/`HEAD` send no body                                | Forwarding an empty body breaks some runtimes.                                                                          |
+| The token is **stripped** from successful auth responses | It lives in the cookie, never in JS.                                                                                    |
+| Network failure → `502` with a synthesised envelope      | One error shape for the client to handle.                                                                               |
 
 ### 4.3 Route gating — `src/proxy.ts`
 
@@ -459,7 +502,9 @@ export function proxy(request: NextRequest): NextResponse {
 
   if (allowed) {
     if (!session) {
-      return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(pathname)}`, request.url));
+      return NextResponse.redirect(
+        new URL(`/login?next=${encodeURIComponent(pathname)}`, request.url),
+      );
     }
     if (!allowed.includes(session.role)) {
       return NextResponse.redirect(new URL('/', request.url));
@@ -479,24 +524,24 @@ export const config = {
 };
 ```
 
-| Path prefix | Allowed roles |
-| --- | --- |
-| `/student/**` | `STUDENT` |
-| `/mentor/**` | `MENTOR`, `ADMIN` |
+| Path prefix         | Allowed roles                               |
+| ------------------- | ------------------------------------------- |
+| `/student/**`       | `STUDENT`                                   |
+| `/mentor/**`        | `MENTOR`, `ADMIN`                           |
 | `/login`, `/signup` | public (redirect away if already signed in) |
-| `/` | public (redirects by role) |
+| `/`                 | public (redirects by role)                  |
 
 > **This is UX, not security.** Next.js's own guidance is to verify authorization inside the handler rather than relying on the proxy alone. Here the **backend** is the real enforcement point — `authorize('MENTOR')` returns `403 ROLE_FORBIDDEN` regardless of what the client does. The proxy only avoids showing a user a page that will fail.
 
 ### 4.4 Session lifecycle
 
-| Event | Flow |
-| --- | --- |
-| Signup | `POST /api/backend/auth/signup` → proxy writes both cookies → `router.push('/student/dashboard')` |
-| Login | `POST /api/backend/auth/login` → proxy writes both cookies → `router.push(roleHome(role))` |
-| Logout | `DELETE /api/session` → clears both cookies → `router.push('/login')` |
+| Event        | Flow                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Signup       | `POST /api/backend/auth/signup` → proxy writes both cookies → `router.push('/student/dashboard')`                                          |
+| Login        | `POST /api/backend/auth/login` → proxy writes both cookies → `router.push(roleHome(role))`                                                 |
+| Logout       | `DELETE /api/session` → clears both cookies → `router.push('/login')`                                                                      |
 | Token expiry | Any call returns `401 AUTH_REQUIRED` → `apiFetch` calls `DELETE /api/session` to clear the cookies server-side, then redirects to `/login` |
-| Role change | The backend does not expose role changes; the session cookie is refreshed on the next login |
+| Role change  | The backend does not expose role changes; the session cookie is refreshed on the next login                                                |
 
 `roleHome(role)` lives in `src/features/auth/`: `STUDENT → '/student/dashboard'`, `MENTOR`/`ADMIN → '/mentor/dashboard'`.
 
@@ -648,17 +693,17 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
 **Error → message mapping.** The API's `message` is already human-readable and domain-specific ("You have already submitted a project with this repository URL."), so it is shown **verbatim**. The mapping below only adds a fallback for codes that arrive without a message:
 
-| Code | Fallback message |
-| --- | --- |
-| `AUTH_REQUIRED` / `AUTH_INVALID` | "Your session has expired. Please sign in again." |
-| `ROLE_FORBIDDEN` | "You do not have permission to perform this action." |
-| `VALIDATION_ERROR` | "Please check the highlighted fields and try again." |
-| `DUPLICATE_SUBMISSION` | "You have already submitted a project with this repository URL." |
-| `EMAIL_ALREADY_EXISTS` | "An account with this email already exists." |
-| `INVALID_STATUS_TRANSITION` | "This submission has already been reviewed." |
-| `RATE_LIMITED` | "Too many attempts. Please wait a moment and try again." |
-| `NOT_FOUND` | "We couldn't find what you were looking for." |
-| `INTERNAL` | "Something went wrong on our end. Please try again." |
+| Code                             | Fallback message                                                 |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `AUTH_REQUIRED` / `AUTH_INVALID` | "Your session has expired. Please sign in again."                |
+| `ROLE_FORBIDDEN`                 | "You do not have permission to perform this action."             |
+| `VALIDATION_ERROR`               | "Please check the highlighted fields and try again."             |
+| `DUPLICATE_SUBMISSION`           | "You have already submitted a project with this repository URL." |
+| `EMAIL_ALREADY_EXISTS`           | "An account with this email already exists."                     |
+| `INVALID_STATUS_TRANSITION`      | "This submission has already been reviewed."                     |
+| `RATE_LIMITED`                   | "Too many attempts. Please wait a moment and try again."         |
+| `NOT_FOUND`                      | "We couldn't find what you were looking for."                    |
+| `INTERNAL`                       | "Something went wrong on our end. Please try again."             |
 
 `401` is special-cased in `apiFetch`: it calls `DELETE /api/session` — the local route handler, which clears the cookies **server-side**, because browser JavaScript cannot delete an httpOnly cookie — and then redirects to `/login?next=<path>` before throwing.
 
@@ -668,30 +713,51 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { ApiError } from '@/lib/api-client';
 
-export function QueryProvider({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 30_000,
-            refetchOnWindowFocus: false,
-            retry: (failureCount, error) => {
-              // Never retry a client error — the request will fail identically.
-              if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
-              return failureCount < 2;
+// A fresh client per server render keeps requests isolated; a single browser
+// client preserves the cache across re-renders.
+let browserQueryClient: QueryClient | undefined;
+
+function getQueryClient(): QueryClient {
+  if (typeof window === 'undefined') return new QueryClient();
+  browserQueryClient ??= new QueryClient();
+  return browserQueryClient;
+}
+
+export function QueryProvider({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider
+      client={
+        getQueryClient() ??
+        new QueryClient({
+          defaultOptions: {
+            queries: {
+              staleTime: 30_000,
+              refetchOnWindowFocus: false,
+              retry: (failureCount, error) => {
+                // Never retry a client error — the request will fail identically.
+                if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+                  return false;
+                }
+                return failureCount < 2;
+              },
             },
           },
-        },
-      }),
+        })
+      }
+    >
+      {children}
+    </QueryClientProvider>
   );
-
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 ```
+
+> The provider follows the pattern in Next.js's own
+> [TanStack Query guide](https://nextjs.org/docs/app/guides/client-side-data-fetching/tanstack-query).
+> Move the `defaultOptions` into `getQueryClient()` so the browser client gets
+> them too — the snippet above keeps them in one place for illustration.
 
 ### 5.4 `src/lib/session.ts`
 
@@ -704,22 +770,26 @@ import { cookies } from 'next/headers';
 export const TOKEN_COOKIE = 'submittly_token';
 export const SESSION_COOKIE = 'submittly_session';
 
-export async function getSession(): Promise<Session | null> { /* read + JSON.parse the cookie */ }
-export async function clearSession(): Promise<void> { /* delete both cookies */ }
+export async function getSession(): Promise<Session | null> {
+  /* read + JSON.parse the cookie */
+}
+export async function clearSession(): Promise<void> {
+  /* delete both cookies */
+}
 ```
 
 ### 5.5 `src/components/shared/`
 
 App-wide composites only. Feature-specific components live in `features/*/components/`.
 
-| Component | Purpose |
-| --- | --- |
-| `app-shell.tsx` | Page chrome: header, nav, main container, `max-w-7xl` |
-| `page-header.tsx` | Title + description + action slot |
+| Component              | Purpose                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `app-shell.tsx`        | Page chrome: header, nav, main container, `max-w-7xl`       |
+| `page-header.tsx`      | Title + description + action slot                           |
 | `loading-skeleton.tsx` | Placeholder blocks that match the shape of the real content |
-| `empty-state.tsx` | Icon + title + description + optional action |
-| `error-state.tsx` | Message + retry button |
-| `status-badge.tsx` | `PENDING` / `APPROVED` / `REJECTED` → colour + label |
+| `empty-state.tsx`      | Icon + title + description + optional action                |
+| `error-state.tsx`      | Message + retry button                                      |
+| `status-badge.tsx`     | `PENDING` / `APPROVED` / `REJECTED` → colour + label        |
 
 ---
 
@@ -734,7 +804,7 @@ App-wide composites only. Feature-specific components live in `features/*/compon
 ```
 app/(auth)/login/page.tsx          Server Component — page shell only
 └── features/auth/components/login-form.tsx      'use client'
-    ├── shadcn Form / Input / Label / Button
+    ├── shadcn Field / Input / Button (see §2.6)
     └── features/auth/components/user-menu.tsx   (in the app shell, not the form)
 ```
 
@@ -772,7 +842,8 @@ export function useLogin() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: LoginInput) => apiFetch<AuthPayload>('/auth/login', { method: 'POST', body: JSON.stringify(input) }),
+    mutationFn: (input: LoginInput) =>
+      apiFetch<AuthPayload>('/auth/login', { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: ({ user }) => {
       queryClient.clear(); // a new identity invalidates every cached query
       router.push(roleHome(user.role));
@@ -785,13 +856,13 @@ export function useLogin() {
 
 **Behaviour**
 
-| Case | Result |
-| --- | --- |
-| Invalid credentials | 401 → toast "Invalid email or password." Form values preserved. |
-| Duplicate email on signup | 409 `EMAIL_ALREADY_EXISTS` → toast under the email field. |
-| Validation error | 400 with `details[]` → mapped onto the matching form fields by `path`. |
-| Rate limited | 429 `RATE_LIMITED` → toast "Too many attempts. Please wait a moment and try again." |
-| Success | Cookies written by the proxy → redirect to the role home. |
+| Case                      | Result                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| Invalid credentials       | 401 → toast "Invalid email or password." Form values preserved.                     |
+| Duplicate email on signup | 409 `EMAIL_ALREADY_EXISTS` → toast under the email field.                           |
+| Validation error          | 400 with `details[]` → mapped onto the matching form fields by `path`.              |
+| Rate limited              | 429 `RATE_LIMITED` → toast "Too many attempts. Please wait a moment and try again." |
+| Success                   | Cookies written by the proxy → redirect to the role home.                           |
 
 ### 6.2 Feature: `submissions` (Student Portal)
 
@@ -805,10 +876,18 @@ const httpUrlSchema = z
   .refine(url => /^https?:\/\//i.test(url), 'URL must start with http:// or https://');
 
 export const createSubmissionSchema = z.object({
-  projectName: z.string().trim().min(3, 'Project name must be at least 3 characters').max(120, 'Project name must be at most 120 characters'),
+  projectName: z
+    .string()
+    .trim()
+    .min(3, 'Project name must be at least 3 characters')
+    .max(120, 'Project name must be at most 120 characters'),
   repoUrl: z.string().trim().pipe(httpUrlSchema),
   liveUrl: z.string().trim().pipe(httpUrlSchema).optional(),
-  description: z.string().trim().min(10, 'Description must be at least 10 characters').max(4000, 'Description must be at most 4000 characters'),
+  description: z
+    .string()
+    .trim()
+    .min(10, 'Description must be at least 10 characters')
+    .max(4000, 'Description must be at most 4000 characters'),
 });
 export type CreateSubmissionInput = z.infer<typeof createSubmissionSchema>;
 ```
@@ -828,21 +907,21 @@ export function useMySubmissions() {
 
 **`/student/dashboard`** — the student's own submissions.
 
-| State | Rendering |
-| --- | --- |
-| Loading | `loading-skeleton` with card-shaped placeholders |
-| Error | `error-state` with a retry button (`refetch()`) |
-| Empty (`total === 0`) | `empty-state`: "No submissions yet" + a "Submit your first project" CTA linking to `/student/submissions/new` |
-| Success | `submission-list` → one `submission-card` per submission: project name, repo link, live link (when present), description, `status-badge`, created-at date |
+| State                 | Rendering                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loading               | `loading-skeleton` with card-shaped placeholders                                                                                                          |
+| Error                 | `error-state` with a retry button (`refetch()`)                                                                                                           |
+| Empty (`total === 0`) | `empty-state`: "No submissions yet" + a "Submit your first project" CTA linking to `/student/submissions/new`                                             |
+| Success               | `submission-list` → one `submission-card` per submission: project name, repo link, live link (when present), description, `status-badge`, created-at date |
 
 **`/student/submissions/new`** — the form.
 
-| Field | Control | Notes |
-| --- | --- | --- |
-| Project name | `Input` | 3–120 characters, counter shown |
-| Repository URL | `Input` | `https://` required; helper text explains the duplicate rule |
-| Live link | `Input` | Optional |
-| Description | `Textarea` | 10–4000 characters, counter shown |
+| Field          | Control    | Notes                                                        |
+| -------------- | ---------- | ------------------------------------------------------------ |
+| Project name   | `Input`    | 3–120 characters, counter shown                              |
+| Repository URL | `Input`    | `https://` required; helper text explains the duplicate rule |
+| Live link      | `Input`    | Optional                                                     |
+| Description    | `Textarea` | 10–4000 characters, counter shown                            |
 
 **Submit flow**
 
@@ -895,32 +974,32 @@ export function useSubmissions(params: { page: number; limit: number; status?: S
 
 **`/mentor/dashboard`** — statistics.
 
-| Card | Source |
-| --- | --- |
-| Total submissions | `stats.total` |
-| Total pending | `stats.pending` |
-| Total approved | `stats.approved` |
-| Total rejected | `stats.rejected` |
+| Card              | Source           |
+| ----------------- | ---------------- |
+| Total submissions | `stats.total`    |
+| Total pending     | `stats.pending`  |
+| Total approved    | `stats.approved` |
+| Total rejected    | `stats.rejected` |
 
-`GET /api/mentor/stats` returns `{ stats: { total, pending, approved, rejected } }`. `total` is the sum of all three — it exceeds the required minimum (Requirements §4.3 asks for at least *Total Pending* and *Total Approved*).
+`GET /api/mentor/stats` returns `{ stats: { total, pending, approved, rejected } }`. `total` is the sum of all three — it exceeds the required minimum (Requirements §4.3 asks for at least _Total Pending_ and _Total Approved_).
 
 **`/mentor/submissions`** — the paginated table.
 
-| Column | Source |
-| --- | --- |
-| Project | `projectName` (+ `repoUrl` as an external link) |
-| Student | `student.name`, `student.email` |
-| Status | `status-badge` |
-| Submitted | `createdAt` (formatted) |
-| Actions | Approve / Reject buttons — only enabled while `status === 'PENDING'` |
+| Column    | Source                                                               |
+| --------- | -------------------------------------------------------------------- |
+| Project   | `projectName` (+ `repoUrl` as an external link)                      |
+| Student   | `student.name`, `student.email`                                      |
+| Status    | `status-badge`                                                       |
+| Submitted | `createdAt` (formatted)                                              |
+| Actions   | Approve / Reject buttons — only enabled while `status === 'PENDING'` |
 
-| State | Rendering |
-| --- | --- |
-| Loading | Table skeleton (header row + N placeholder rows) |
-| Error | `error-state` with retry |
-| Empty, no filter | "No submissions have been submitted yet." |
-| Empty, filtered | "No submissions match this filter." + a "Clear filter" action |
-| Success | Rows + pagination controls |
+| State            | Rendering                                                     |
+| ---------------- | ------------------------------------------------------------- |
+| Loading          | Table skeleton (header row + N placeholder rows)              |
+| Error            | `error-state` with retry                                      |
+| Empty, no filter | "No submissions have been submitted yet."                     |
+| Empty, filtered  | "No submissions match this filter." + a "Clear filter" action |
+| Success          | Rows + pagination controls                                    |
 
 **`use-update-status.ts`**
 
@@ -959,17 +1038,17 @@ Only `PENDING → APPROVED | REJECTED` is allowed. Rows that are not `PENDING` r
 
 The browser calls `/api/backend/<path>`; the proxy forwards to `<API_URL>/api/<path>`.
 
-| Method | Browser path | Backend path | Access | Success payload |
-| --- | --- | --- | --- | --- |
-| GET | `/api/backend/health` | `/api/health` | public | `{ status, nodeEnv, uptimeSeconds }` |
-| POST | `/api/backend/auth/signup` | `/api/auth/signup` | public | `201` — `{ user, token }` |
-| POST | `/api/backend/auth/login` | `/api/auth/login` | public | `200` — `{ user, token }` |
-| POST | `/api/backend/submissions` | `/api/submissions` | `STUDENT` | `201` — `{ submission }` |
-| GET | `/api/backend/submissions/me` | `/api/submissions/me` | `STUDENT` | `{ items, total }` |
-| GET | `/api/backend/mentor/submissions?page&limit&status` | `/api/mentor/submissions` | `MENTOR`, `ADMIN` | `{ items, page, limit, total, totalPages }` |
-| PATCH | `/api/backend/mentor/submissions/:id/status` | `/api/mentor/submissions/:id/status` | `MENTOR`, `ADMIN` | `{ submission }` |
-| GET | `/api/backend/mentor/stats` | `/api/mentor/stats` | `MENTOR`, `ADMIN` | `{ stats }` |
-| DELETE | `/api/session` | — (local) | — | `204` — clears cookies |
+| Method | Browser path                                        | Backend path                         | Access            | Success payload                             |
+| ------ | --------------------------------------------------- | ------------------------------------ | ----------------- | ------------------------------------------- |
+| GET    | `/api/backend/health`                               | `/api/health`                        | public            | `{ status, nodeEnv, uptimeSeconds }`        |
+| POST   | `/api/backend/auth/signup`                          | `/api/auth/signup`                   | public            | `201` — `{ user, token }`                   |
+| POST   | `/api/backend/auth/login`                           | `/api/auth/login`                    | public            | `200` — `{ user, token }`                   |
+| POST   | `/api/backend/submissions`                          | `/api/submissions`                   | `STUDENT`         | `201` — `{ submission }`                    |
+| GET    | `/api/backend/submissions/me`                       | `/api/submissions/me`                | `STUDENT`         | `{ items, total }`                          |
+| GET    | `/api/backend/mentor/submissions?page&limit&status` | `/api/mentor/submissions`            | `MENTOR`, `ADMIN` | `{ items, page, limit, total, totalPages }` |
+| PATCH  | `/api/backend/mentor/submissions/:id/status`        | `/api/mentor/submissions/:id/status` | `MENTOR`, `ADMIN` | `{ submission }`                            |
+| GET    | `/api/backend/mentor/stats`                         | `/api/mentor/stats`                  | `MENTOR`, `ADMIN` | `{ stats }`                                 |
+| DELETE | `/api/session`                                      | — (local)                            | —                 | `204` — clears cookies                      |
 
 **Envelopes** — the client never reshapes these:
 
@@ -983,17 +1062,17 @@ The browser calls `/api/backend/<path>`; the proxy forwards to `<API_URL>/api/<p
 
 **Status codes the client must handle**
 
-| Code | Meaning | Client behaviour |
-| --- | --- | --- |
-| 200 / 201 | Success | Unwrap `data` |
-| 400 | Validation failed | Map `details[]` onto form fields |
-| 401 | Missing / expired / invalid token | Clear session → redirect to `/login?next=…` |
-| 403 | Role lacks permission | Toast + redirect to the role home |
-| 404 | Not found | Toast + refetch |
-| 409 | Duplicate submission / email exists | Inline error on the relevant field |
-| 422 | Already reviewed | Toast + refetch |
-| 429 | Rate limited | Toast "Too many attempts…" + disable the action |
-| 500 / 502 | Server or network failure | Generic toast + retry button |
+| Code      | Meaning                             | Client behaviour                                |
+| --------- | ----------------------------------- | ----------------------------------------------- |
+| 200 / 201 | Success                             | Unwrap `data`                                   |
+| 400       | Validation failed                   | Map `details[]` onto form fields                |
+| 401       | Missing / expired / invalid token   | Clear session → redirect to `/login?next=…`     |
+| 403       | Role lacks permission               | Toast + redirect to the role home               |
+| 404       | Not found                           | Toast + refetch                                 |
+| 409       | Duplicate submission / email exists | Inline error on the relevant field              |
+| 422       | Already reviewed                    | Toast + refetch                                 |
+| 429       | Rate limited                        | Toast "Too many attempts…" + disable the action |
+| 500 / 502 | Server or network failure           | Generic toast + retry button                    |
 
 **Query parameters** for the mentor list: `page` (≥ 1, default 1), `limit` (1–50, default 10), `status` (`PENDING` | `APPROVED` | `REJECTED`, optional).
 
@@ -1003,15 +1082,15 @@ The browser calls `/api/backend/<path>`; the proxy forwards to `<API_URL>/api/<p
 
 ## 8. Routing Map
 
-| Route | Access | Page | Server Component | Client Islands |
-| --- | --- | --- | --- | --- |
-| `/` | public | Landing / role redirect | ✅ | — |
-| `/login` | public | Sign in | ✅ | Login form |
-| `/signup` | public | Register | ✅ | Signup form |
-| `/student/dashboard` | `STUDENT` | My submissions | ✅ (shell) | Submission list |
-| `/student/submissions/new` | `STUDENT` | New submission | ✅ | Submission form |
-| `/mentor/dashboard` | `MENTOR`, `ADMIN` | Statistics | ✅ (shell) | Stats cards |
-| `/mentor/submissions` | `MENTOR`, `ADMIN` | Review table | ✅ (shell) | Table, filter, pagination, dialog |
+| Route                      | Access            | Page                    | Server Component | Client Islands                    |
+| -------------------------- | ----------------- | ----------------------- | ---------------- | --------------------------------- |
+| `/`                        | public            | Landing / role redirect | ✅               | —                                 |
+| `/login`                   | public            | Sign in                 | ✅               | Login form                        |
+| `/signup`                  | public            | Register                | ✅               | Signup form                       |
+| `/student/dashboard`       | `STUDENT`         | My submissions          | ✅ (shell)       | Submission list                   |
+| `/student/submissions/new` | `STUDENT`         | New submission          | ✅               | Submission form                   |
+| `/mentor/dashboard`        | `MENTOR`, `ADMIN` | Statistics              | ✅ (shell)       | Stats cards                       |
+| `/mentor/submissions`      | `MENTOR`, `ADMIN` | Review table            | ✅ (shell)       | Table, filter, pagination, dialog |
 
 Route groups `(auth)`, `(student)`, and `(mentor)` do **not** appear in the URL.
 
@@ -1023,29 +1102,29 @@ Route groups `(auth)`, `(student)`, and `(mentor)` do **not** appear in the URL.
 
 **shadcn components to use**
 
-| Need | Component |
-| --- | --- |
-| Forms | `Form`, `Input`, `Textarea`, `Label`, `Select` |
-| Layout | `Card`, `Separator`, `Tabs` |
-| Data | `Table`, `Badge`, `Pagination`, `Skeleton` |
-| Feedback | `Alert`, `Dialog`, `DropdownMenu`, `Avatar` |
-| Actions | `Button` |
+| Need     | Component                                                |
+| -------- | -------------------------------------------------------- |
+| Forms    | `Field` family, `Input`, `Textarea`, `Select` (see §2.6) |
+| Layout   | `Card`, `Separator`, `Tabs`                              |
+| Data     | `Table`, `Badge`, `Pagination`, `Skeleton`               |
+| Feedback | `Alert`, `Dialog`, `DropdownMenu`, `Avatar`              |
+| Actions  | `Button`                                                 |
 
 **Status badge colour mapping** (in `components/shared/status-badge.tsx`)
 
-| Status | Label | Variant |
-| --- | --- | --- |
-| `PENDING` | Pending | `secondary` (neutral) |
-| `APPROVED` | Approved | `default` (primary) |
-| `REJECTED` | Rejected | `destructive` |
+| Status     | Label    | Variant               |
+| ---------- | -------- | --------------------- |
+| `PENDING`  | Pending  | `secondary` (neutral) |
+| `APPROVED` | Approved | `default` (primary)   |
+| `REJECTED` | Rejected | `destructive`         |
 
 **Responsive breakpoints**
 
-| Viewport | Student dashboard | Mentor table |
-| --- | --- | --- |
-| `< 768px` (mobile) | Cards, stacked | Cards instead of a table |
-| `768px–1024px` (tablet) | Cards, stacked | Table, horizontal scroll |
-| `≥ 1024px` (desktop) | Two-column card grid | Full table + filters inline |
+| Viewport                | Student dashboard    | Mentor table                |
+| ----------------------- | -------------------- | --------------------------- |
+| `< 768px` (mobile)      | Cards, stacked       | Cards instead of a table    |
+| `768px–1024px` (tablet) | Cards, stacked       | Table, horizontal scroll    |
+| `≥ 1024px` (desktop)    | Two-column card grid | Full table + filters inline |
 
 The mentor table becomes a stacked card list below `md` — a horizontally scrolling table is unusable on a phone.
 
@@ -1057,30 +1136,30 @@ The mentor table becomes a stacked card list below `md` — a horizontally scrol
 
 ## 10. Requirements Traceability
 
-| Requirement | Implementation |
-| --- | --- |
-| §4.1 Login page | `/login` → `use-login` → `POST /auth/login` |
-| §4.1 Signup page for students | `/signup` → `use-signup` → `POST /auth/signup` (server assigns `STUDENT`) |
-| §4.1 JWT authentication | Token in the `submittly_token` httpOnly cookie; the proxy attaches the Bearer header |
-| §4.1 RBAC on protected routes | Server-side `authorize`; client-side role gates in `src/proxy.ts` (§4.3) |
-| §4.1 Students cannot reach mentor actions | `/student/**` and `/mentor/**` are disjoint; the server returns `403` regardless |
-| §4.2 Form with name / repo / live / description | `/student/submissions/new`, `createSubmissionSchema` |
-| §4.2 Robust validation | Zod on the client for UX; Zod on the server for truth |
-| §4.2 Duplicate prevention | Server-side unique `(studentId, normalized repoUrl)` → `409`; the client surfaces it inline (§6.2) |
-| §4.2 Rate limiting | `submitLimiter` on the server → `429`; the client toasts and disables the action |
-| §4.2 Clear success / error feedback | Toast on success; inline field errors and toasts on failure |
-| §4.3 Paginated table | `/mentor/submissions` + shadcn `Table` + `Pagination` |
-| §4.3 Approve / reject | `review-dialog` → `PATCH /mentor/submissions/:id/status` |
-| §4.3 Server-side filters | `status` sent as a query param; filtering happens in the database |
-| §4.3 Aggregated statistics | `/mentor/dashboard` → `GET /mentor/stats` |
-| §4.4 Statuses | `PENDING` / `APPROVED` / `REJECTED`, mirrored in `types/api.ts` and rendered by `status-badge` |
-| §6 Loading / empty / success / error states | Every data view has all four (§6.2, §6.3) |
-| §6 Secrets in env vars | `API_URL` is server-only; `.env` is git-ignored; `.env.example` documents it |
-| §9 TypeScript throughout | `strict: true` + the flags from §2.3 |
-| §9 Responsive, accessible interface | Tailwind breakpoints (§9); a11y rules in `coding-style.md` §9 |
-| §9 Server-side pagination and filtering | `page` / `limit` / `status` are query-string state (§6.3) |
-| §9 Authorization on the backend | The backend is authoritative; the client only mirrors it for UX |
-| §9 README with setup + env docs | Outlet 7 |
+| Requirement                                     | Implementation                                                                                     |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| §4.1 Login page                                 | `/login` → `use-login` → `POST /auth/login`                                                        |
+| §4.1 Signup page for students                   | `/signup` → `use-signup` → `POST /auth/signup` (server assigns `STUDENT`)                          |
+| §4.1 JWT authentication                         | Token in the `submittly_token` httpOnly cookie; the proxy attaches the Bearer header               |
+| §4.1 RBAC on protected routes                   | Server-side `authorize`; client-side role gates in `src/proxy.ts` (§4.3)                           |
+| §4.1 Students cannot reach mentor actions       | `/student/**` and `/mentor/**` are disjoint; the server returns `403` regardless                   |
+| §4.2 Form with name / repo / live / description | `/student/submissions/new`, `createSubmissionSchema`                                               |
+| §4.2 Robust validation                          | Zod on the client for UX; Zod on the server for truth                                              |
+| §4.2 Duplicate prevention                       | Server-side unique `(studentId, normalized repoUrl)` → `409`; the client surfaces it inline (§6.2) |
+| §4.2 Rate limiting                              | `submitLimiter` on the server → `429`; the client toasts and disables the action                   |
+| §4.2 Clear success / error feedback             | Toast on success; inline field errors and toasts on failure                                        |
+| §4.3 Paginated table                            | `/mentor/submissions` + shadcn `Table` + `Pagination`                                              |
+| §4.3 Approve / reject                           | `review-dialog` → `PATCH /mentor/submissions/:id/status`                                           |
+| §4.3 Server-side filters                        | `status` sent as a query param; filtering happens in the database                                  |
+| §4.3 Aggregated statistics                      | `/mentor/dashboard` → `GET /mentor/stats`                                                          |
+| §4.4 Statuses                                   | `PENDING` / `APPROVED` / `REJECTED`, mirrored in `types/api.ts` and rendered by `status-badge`     |
+| §6 Loading / empty / success / error states     | Every data view has all four (§6.2, §6.3)                                                          |
+| §6 Secrets in env vars                          | `API_URL` is server-only; `.env` is git-ignored; `.env.example` documents it                       |
+| §9 TypeScript throughout                        | `strict: true` + the flags from §2.3                                                               |
+| §9 Responsive, accessible interface             | Tailwind breakpoints (§9); a11y rules in `coding-style.md` §9                                      |
+| §9 Server-side pagination and filtering         | `page` / `limit` / `status` are query-string state (§6.3)                                          |
+| §9 Authorization on the backend                 | The backend is authoritative; the client only mirrors it for UX                                    |
+| §9 README with setup + env docs                 | Outlet 7                                                                                           |
 
 ---
 
@@ -1090,12 +1169,16 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 
 ### Outlet 1 — Scaffold & tooling
 
-- [ ] `create-next-app` with `--ts --app --src-dir --tailwind --eslint --import-alias "@/*"`
-- [ ] `tsconfig.json`: alias → `./src/*`, add `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` (§2.3)
-- [ ] `shadcn init` + `components.json` matches §2.4; theme tokens in `globals.css` (§2.5)
-- [ ] `prettier` + `prettier-plugin-tailwindcss`; `.prettierrc` matches the server's baseline
-- [ ] `.env.example` with `API_URL` documented; `.env` git-ignored
-- [ ] `npm run lint`, `npm run typecheck`, `npm run build` all clean
+- [x] `create-next-app` with `--ts --app --src-dir --tailwind --eslint --import-alias "@/*"`
+- [x] `tsconfig.json`: alias → `./src/*`, add `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` (§2.3)
+- [x] `shadcn init --base radix --preset nova` + `components.json` matches §2.4; theme tokens in `globals.css` (§2.5)
+- [x] 18 shadcn components generated into `src/components/ui/` (incl. `field` + `input-group` — §2.6)
+- [x] `prettier` + `prettier-plugin-tailwindcss`; `.prettierrc` matches the server's baseline
+- [x] `.env.example` with `API_URL` documented; `.env` git-ignored
+- [x] `package.json` `overrides` pins the `effect` peer conflict (§2.1)
+- [x] `next.config.ts`: `cacheComponents` off, `partialPrefetching` unset (§12 #11)
+- [x] `npm run lint`, `npm run typecheck`, `npm run build` all clean
+- [x] `npm run dev` boots and serves HTTP 200
 
 ### Outlet 2 — Shared infrastructure
 
@@ -1155,15 +1238,19 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 
 ## 12. Open Decisions Log
 
-| # | Area | Decision | Notes |
-| --- | --- | --- | --- |
-| 1 | Token storage | httpOnly `submittly_token` cookie + server-side proxy | The token never reaches browser JS; CORS is never exercised |
-| 2 | Role gating | Separate httpOnly `submittly_session` cookie, read by `src/proxy.ts` | Holds no secret; avoids re-verifying the JWT on every navigation |
-| 3 | Middleware naming | `src/proxy.ts` (not `middleware.ts`) | Next.js 16 renamed the convention; `middleware.ts` is deprecated |
-| 4 | Server state | TanStack Query v5 | Cache, invalidation, and explicit states without hand-rolled `useEffect` fetching |
-| 5 | Rendering | Server Components by default; `'use client'` only on interactive islands | Matches Next.js guidance and keeps the JS payload small |
-| 6 | Pagination & filter state | `searchParams` (URL-driven) | Shareable URLs, working back button, server stays authoritative |
-| 7 | Pagination UI | shadcn `Table` + `Pagination` — no `@tanstack/react-table` | The table needs no client-side sorting or row selection |
-| 8 | Schema sharing | **Duplicate** the server's Zod schemas in `features/*/schemas.ts` | A shared package would need a monorepo; duplication is the smaller change. **Risk: drift.** Mitigation — the server and client schemas live in adjacent files with identical constraint text, and any server-side rule change updates both in the same PR. Revisit if a third consumer appears. |
-| 9 | Review comment | Optional, in the confirm dialog, max 1000 characters | Matches the server's `updateStatusSchema` exactly |
-| 10 | Landing page | Redirect straight to the role home when signed in; otherwise a minimal public page | Keeps the route table small while still giving signed-out users a way in |
+| #   | Area                      | Decision                                                                           | Notes                                                                                                                                                                                                                                                                                                                                                                               |
+| --- | ------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Token storage             | httpOnly `submittly_token` cookie + server-side proxy                              | The token never reaches browser JS; CORS is never exercised                                                                                                                                                                                                                                                                                                                         |
+| 2   | Role gating               | Separate httpOnly `submittly_session` cookie, read by `src/proxy.ts`               | Holds no secret; avoids re-verifying the JWT on every navigation                                                                                                                                                                                                                                                                                                                    |
+| 3   | Middleware naming         | `src/proxy.ts` (not `middleware.ts`)                                               | Next.js 16 renamed the convention; `middleware.ts` is deprecated                                                                                                                                                                                                                                                                                                                    |
+| 4   | Server state              | TanStack Query v5                                                                  | Cache, invalidation, and explicit states without hand-rolled `useEffect` fetching                                                                                                                                                                                                                                                                                                   |
+| 5   | Rendering                 | Server Components by default; `'use client'` only on interactive islands           | Matches Next.js guidance and keeps the JS payload small                                                                                                                                                                                                                                                                                                                             |
+| 6   | Pagination & filter state | `searchParams` (URL-driven)                                                        | Shareable URLs, working back button, server stays authoritative                                                                                                                                                                                                                                                                                                                     |
+| 7   | Pagination UI             | shadcn `Table` + `Pagination` — no `@tanstack/react-table`                         | The table needs no client-side sorting or row selection                                                                                                                                                                                                                                                                                                                             |
+| 8   | Schema sharing            | **Duplicate** the server's Zod schemas in `features/*/schemas.ts`                  | A shared package would need a monorepo; duplication is the smaller change. **Risk: drift.** Mitigation — the server and client schemas live in adjacent files with identical constraint text, and any server-side rule change updates both in the same PR. Revisit if a third consumer appears.                                                                                     |
+| 9   | Review comment            | Optional, in the confirm dialog, max 1000 characters                               | Matches the server's `updateStatusSchema` exactly                                                                                                                                                                                                                                                                                                                                   |
+| 10  | Landing page              | Redirect straight to the role home when signed in; otherwise a minimal public page | Keeps the route table small while still giving signed-out users a way in                                                                                                                                                                                                                                                                                                            |
+| 11  | Cache Components          | `cacheComponents` **off**; `partialPrefetching` unset                              | Enabling Cache Components is not a rename-only change — it requires adopting the Cache Components model and surfaces build errors for uncached data outside `<Suspense>`. `partialPrefetching` throws at config validation without it. The app reads cookies for the session and leans on TanStack Query, so the default dynamic model is the predictable fit. Revisit in Outlet 6. |
+| 12  | Form primitives           | shadcn v4 `<Field>` family + react-hook-form `<Controller>`                        | shadcn v4 removed the old `Form` component. `Field` gives explicit control over markup while keeping accessibility (`data-invalid`, `aria-invalid`, `FieldError`) — see §2.6                                                                                                                                                                                                        |
+| 13  | Radix packaging           | The unified `radix-ui` package, not individual `@radix-ui/*`                       | This is what shadcn v4 installs; matching it avoids duplicate primitives                                                                                                                                                                                                                                                                                                            |
+| 14  | `effect` peer conflict    | Pinned via `package.json` `overrides`                                              | `@hookform/resolvers@6` declares an optional `effect@^4` peer that contradicts the `@typeschema` chain's `effect@^3`. The zod resolver never touches `effect`. Using `--legacy-peer-deps` instead would disable peer checking project-wide.                                                                                                                                         |
