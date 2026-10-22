@@ -1051,13 +1051,29 @@ The page is a Server Component that renders `<MySubmissions />`, a client compon
 /mentor/submissions?page=2&limit=10&status=APPROVED
 ```
 
+**`review/params.ts`** — the URL-driven list state.
+
+`page`, `limit` and `status` live in the query string, so a filtered view is shareable and the back button works. That makes the query string **user input**, so every value is parsed defensively before it reaches the API:
+
+```ts
+export function parsePage(raw: string | null): number;
+export function parseLimit(raw: string | null): number;
+export function parseStatus(raw: string | null): SubmissionStatus | undefined;
+export function buildListParams(
+  current: URLSearchParams,
+  changes: ListParamChanges,
+): URLSearchParams;
+```
+
+`buildListParams` resets to page 1 when the **filter** or the **page size** changes — a filtered list is a new list, and page 4 of the previous filter is meaningless.
+
 **`review/keys.ts`** — a query-key factory. Never inline a key string.
 
 ```ts
 export const reviewKeys = {
   all: ['review'] as const,
   submissions: () => [...reviewKeys.all, 'submissions'] as const,
-  submissionsList: (params: { page: number; limit: number; status?: SubmissionStatus }) =>
+  submissionsList: (params: { page: number; limit: number; status?: string | undefined }) =>
     [...reviewKeys.submissions(), 'list', params] as const,
   stats: () => [...reviewKeys.all, 'stats'] as const,
 };
@@ -1066,14 +1082,10 @@ export const reviewKeys = {
 **`use-submissions.ts`**
 
 ```ts
-export function useSubmissions(params: { page: number; limit: number; status?: SubmissionStatus }) {
+export function useSubmissions(params: ListSubmissionsParams) {
   return useQuery({
     queryKey: reviewKeys.submissionsList(params),
-    queryFn: () => {
-      const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
-      if (params.status) query.set('status', params.status);
-      return apiFetch<PaginatedSubmissions>(`/mentor/submissions?${query.toString()}`);
-    },
+    queryFn: () => listSubmissions(params),
     placeholderData: keepPreviousData, // no layout jump while paginating
   });
 }
@@ -1108,6 +1120,8 @@ export function useSubmissions(params: { page: number; limit: number; status?: S
 | Empty, filtered  | "No submissions match this filter." + a "Clear filter" action |
 | Success          | Rows + pagination controls                                    |
 
+The page is a Server Component that renders `<SubmissionsExplorer />` (a client component) inside a `<Suspense>` boundary. The explorer owns the URL state, the query, the filter, the table, the pagination, and the review dialog. Below `md` the table becomes a stacked card list — a horizontally scrolling table is unusable on a phone.
+
 **`use-update-status.ts`**
 
 ```ts
@@ -1115,18 +1129,32 @@ export function useUpdateStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status, comment }: UpdateStatusInput & { id: string }) =>
-      apiFetch<{ submission: ReviewSubmission }>(`/mentor/submissions/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status, comment }),
-      }),
+    mutationFn: ({ id, ...input }: UpdateStatusVariables) => updateStatus(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: reviewKeys.submissions() });
       queryClient.invalidateQueries({ queryKey: reviewKeys.stats() });
     },
+    onError: error => {
+      // Another mentor may have reviewed the same submission first.
+      if (error instanceof ApiError && error.code === 'INVALID_STATUS_TRANSITION') {
+        queryClient.invalidateQueries({ queryKey: reviewKeys.submissions() });
+        queryClient.invalidateQueries({ queryKey: reviewKeys.stats() });
+      }
+    },
   });
 }
 ```
+
+**Review flow**
+
+1. The mentor clicks **Approve** or **Reject**.
+2. A `review-dialog` opens with an optional comment (`Textarea`, max 1000 characters) and an explicit confirm/cancel pair.
+3. `PATCH /api/mentor/submissions/:id/status` with `{ status: 'APPROVED' | 'REJECTED', comment? }`.
+4. **200** → toast "Submission approved." / "Submission rejected." → the table and stats refetch.
+5. **422 `INVALID_STATUS_TRANSITION`** → toast "This submission has already been reviewed." The dialog closes and the list refetches, so the row shows its real state rather than a stale "Pending".
+6. **404 `NOT_FOUND`** → the error is shown inline in the dialog.
+
+Only `PENDING → APPROVED | REJECTED` is allowed. Rows that are not `PENDING` render their actions disabled with a tooltip explaining why.
 
 **Review flow**
 
@@ -1343,12 +1371,22 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 
 ### Outlet 5 — Feature: `review` (Mentor Dashboard)
 
-- [ ] `features/review/{schemas,keys,api,types}.ts`
-- [ ] `features/review/hooks/use-submissions.ts`, `use-stats.ts`, `use-update-status.ts`
-- [ ] `features/review/components/{stats-cards,submissions-table,status-filter,pagination,review-dialog}.tsx`
-- [ ] `app/(mentor)/mentor/layout.tsx`, `dashboard/page.tsx`, `submissions/page.tsx`
+- [x] `features/review/{schemas,keys,api,types,params}.ts`
+- [x] `features/review/hooks/use-submissions.ts`, `use-stats.ts`, `use-update-status.ts`
+- [x] `features/review/components/{stats-cards,stats-overview,submissions-table,submissions-explorer,status-filter,table-pagination,review-dialog}.tsx`
+- [x] `app/(mentor)/mentor/dashboard/page.tsx` (the real one now), `app/(mentor)/mentor/submissions/page.tsx`
+- [x] URL-driven `page` / `limit` / `status` state, parsed defensively (`features/review/params.ts`)
+- [x] Smoke: the statistics render with real counts
+- [x] Smoke: the table shows the student name and email
+- [x] Smoke: the status filter is server-side — the URL carries it and every visible row matches
+- [x] Smoke: `limit=5` gives 5 rows and the server's `totalPages` drives the pager
+- [x] Smoke: the next-page control moves the URL to `page=2` and the table follows
+- [x] Smoke: approve → the dialog opens, a comment can be typed, the review is applied
+- [x] Smoke: the already-reviewed race → the client shows the message and the list refetches
+- [x] Smoke: a student token is refused with `403 ROLE_FORBIDDEN`
+- [x] Verified in a real browser (headless Chrome over CDP): 44/44 checks
 - [ ] URL-driven `page` / `limit` / `status` state
-- [ ] Smoke: list → 200 with student info; filter → 200; pagination → correct `totalPages`; approve → 200; re-approve → 422 toast; stats reflect the reviews; student token → 403
+- [x] Smoke: list → 200 with student info; filter → 200; pagination → correct `totalPages`; approve → 200; re-approve → 422 toast; stats reflect the reviews; student token → 403
 
 ### Outlet 6 — Polish, states & accessibility
 

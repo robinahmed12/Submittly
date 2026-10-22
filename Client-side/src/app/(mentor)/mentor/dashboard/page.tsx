@@ -1,33 +1,26 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PageHeader } from '@/components/shared/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { StatsOverview } from '@/features/review/components/stats-overview';
 
 export const metadata: Metadata = {
   title: 'Mentor dashboard',
 };
 
-/**
- * Placeholder — the real mentor dashboard arrives in Outlet 5.
- *
- * It exists so the post-login redirect for a mentor or admin has somewhere
- * to land, and so the persona layout is exercised end to end.
- */
 export default function MentorDashboardPage() {
   return (
     <>
       <PageHeader
         title="Mentor dashboard"
         description="Aggregated statistics for every project submission."
+        action={
+          <Button asChild>
+            <Link href="/mentor/submissions">Review submissions</Link>
+          </Button>
+        }
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Nothing here yet</CardTitle>
-          <CardDescription>
-            The statistics cards and the review queue arrive in Outlet 5.
-          </CardDescription>
-        </CardHeader>
-        <CardContent />
-      </Card>
+      <StatsOverview />
     </>
   );
 }

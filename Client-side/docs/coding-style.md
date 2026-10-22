@@ -212,6 +212,10 @@ A folder gains a new top-level file only when it earns it. Four small files beat
   ```
 
 - **Every key includes every input that changes the result.** A `status` filter missing from the key returns stale data for the wrong filter.
+- **List state lives in the URL, not in component state.** `page`, `limit` and `status` go in the query string so a view is shareable and the back button works.
+- **The query string is user input.** Parse every value defensively before it reaches the API — `Number('abc')` is `NaN`, and `page=0` is not a page.
+- **Changing the filter or the page size resets to page 1.** A filtered list is a new list; page 4 of the previous filter is meaningless.
+- **`keepPreviousData` is deliberate.** The old rows stay on screen while the next page loads, so the table does not flash empty. Tests must wait for the new data rather than asserting immediately.
 - **Mutations invalidate, they do not patch.** After a write, invalidate the affected keys and let the query refetch:
 
   ```ts
