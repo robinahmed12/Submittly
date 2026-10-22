@@ -3,13 +3,13 @@
 > Companion doc: [coding-style.md](./coding-style.md)
 > Requirements source: [../../Docs/submittly_project_requirements.md](../../Docs/submittly_project_requirements.md)
 
-|              |                                                         |
-| ------------ | ------------------------------------------------------- |
-| Architecture | Feature-based (vertical slices)                         |
+|              |                                                           |
+| ------------ | --------------------------------------------------------- |
+| Architecture | Feature-based (vertical slices)                           |
 | Stack        | Node.js + TypeScript, Express 5, Prisma ORM 7, PostgreSQL |
-| Auth         | JWT (Bearer) + role-based access control                |
-| Validation   | Zod (server-side, always)                               |
-| Status       | Planned — build starts at Phase 1                       |
+| Auth         | JWT (Bearer) + role-based access control                  |
+| Validation   | Zod (server-side, always)                                 |
+| Status       | Planned — build starts at Phase 1                         |
 
 ---
 
@@ -28,16 +28,16 @@ Non-negotiable rules that shape this plan:
 
 ## 2. Tech Stack & Dependencies
 
-| Layer          | Choice                                                         | Notes                                                                    |
-| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Runtime        | Node.js 20+                                                    |                                                                          |
-| Framework      | Express 5                                                      | Built-in promise rejection handling (no need for `express-async-errors`) |
-| Language       | TypeScript 5, `strict: true, exactOptionalPropertyTypes: true` |                                                                          |
-| ORM            | Prisma 7 + PostgreSQL                                       | `prisma-client` generator + `@prisma/adapter-pg` driver adapter; URL in `prisma.config.ts` |
-| Validation     | Zod 4                                                          | Schemas are the single source of truth for inputs and types              |
-| Auth           | `jsonwebtoken`, `bcryptjs`                                     | Access token in `Authorization: Bearer`; 12 salt rounds                  |
-| HTTP hardening | `helmet`, `cors`, `express-rate-limit`                         |                                                                          |
-| Dev tooling    | `tsx`, ESLint (typescript-eslint), Prettier                    | `tsx watch src/server.ts` for dev                                        |
+| Layer          | Choice                                                         | Notes                                                                                      |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Runtime        | Node.js 20+                                                    |                                                                                            |
+| Framework      | Express 5                                                      | Built-in promise rejection handling (no need for `express-async-errors`)                   |
+| Language       | TypeScript 5, `strict: true, exactOptionalPropertyTypes: true` |                                                                                            |
+| ORM            | Prisma 7 + PostgreSQL                                          | `prisma-client` generator + `@prisma/adapter-pg` driver adapter; URL in `prisma.config.ts` |
+| Validation     | Zod 4                                                          | Schemas are the single source of truth for inputs and types                                |
+| Auth           | `jsonwebtoken`, `bcryptjs`                                     | Access token in `Authorization: Bearer`; 12 salt rounds                                    |
+| HTTP hardening | `helmet`, `cors`, `express-rate-limit`                         |                                                                                            |
+| Dev tooling    | `tsx`, ESLint (typescript-eslint), Prettier                    | `tsx watch src/server.ts` for dev                                                          |
 
 **Install**
 
@@ -263,11 +263,11 @@ model Feedback {
 
 **Connection setup (Prisma 7)**
 
-| Where | How |
-| --- | --- |
-| CLI (migrate / db / studio) | `prisma.config.ts` → `datasource.url: process.env.DATABASE_URL` (the schema no longer holds the URL) |
-| Runtime (the app) | `src/db/prisma.ts` → `new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) })` |
-| Client code | `import { PrismaClient } from '@/generated/prisma/client'` — generated into `src/generated/prisma` (git-ignored, regenerated by `npm run prisma:generate` / `postinstall`) |
+| Where                       | How                                                                                                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI (migrate / db / studio) | `prisma.config.ts` → `datasource.url: process.env.DATABASE_URL` (the schema no longer holds the URL)                                                                       |
+| Runtime (the app)           | `src/db/prisma.ts` → `new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) })`                                                                 |
+| Client code                 | `import { PrismaClient } from '@/generated/prisma/client'` — generated into `src/generated/prisma` (git-ignored, regenerated by `npm run prisma:generate` / `postinstall`) |
 
 Schema decisions:
 
@@ -315,6 +315,7 @@ export type ApiErrorCode =
   | 'ROLE_FORBIDDEN'
   | 'VALIDATION_ERROR'
   | 'DUPLICATE_SUBMISSION'
+  | 'EMAIL_ALREADY_EXISTS'
   | 'INVALID_STATUS_TRANSITION'
   | 'RATE_LIMITED'
   | 'NOT_FOUND'
@@ -325,6 +326,7 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly code: ApiErrorCode,
+    readonly details?: ApiErrorDetail[],
   ) {
     super(message);
   }
@@ -333,16 +335,16 @@ export class ApiError extends Error {
 
 Every service failure that the client should see is `throw new ApiError(...)`; the central error handler renders it. Mapping used throughout:
 
-| Status | When                                                                    | Typical code                     |
-| ------ | ----------------------------------------------------------------------- | -------------------------------- |
-| 400    | Zod validation failure                                                  | `VALIDATION_ERROR`               |
-| 401    | Missing / expired / malformed token                                     | `AUTH_REQUIRED` / `AUTH_INVALID` |
-| 403    | Role lacks permission (student on mentor route)                         | `ROLE_FORBIDDEN`                 |
-| 404    | Submission not found                                                    | `NOT_FOUND`                      |
-| 409    | Duplicate submission rule violated                                      | `DUPLICATE_SUBMISSION`           |
-| 422    | Not accepting `PENDING → APPROVED/REJECTED` on an already-reviewed item | `INVALID_STATUS_TRANSITION`      |
-| 429    | Rate limit tripped                                                      | `RATE_LIMITED`                   |
-| 500    | Unhandled failure (server-side only)                                    | `INTERNAL`                       |
+| Status | When                                                                    | Typical code                                    |
+| ------ | ----------------------------------------------------------------------- | ----------------------------------------------- |
+| 400    | Zod validation failure                                                  | `VALIDATION_ERROR`                              |
+| 401    | Missing / expired / malformed token                                     | `AUTH_REQUIRED` / `AUTH_INVALID`                |
+| 403    | Role lacks permission (student on mentor route)                         | `ROLE_FORBIDDEN`                                |
+| 404    | Submission not found                                                    | `NOT_FOUND`                                     |
+| 409    | Duplicate submission rule violated / email already registered           | `DUPLICATE_SUBMISSION` / `EMAIL_ALREADY_EXISTS` |
+| 422    | Not accepting `PENDING → APPROVED/REJECTED` on an already-reviewed item | `INVALID_STATUS_TRANSITION`                     |
+| 429    | Rate limit tripped                                                      | `RATE_LIMITED`                                  |
+| 500    | Unhandled failure (server-side only)                                    | `INTERNAL`                                      |
 
 ### 5.4 Middlewares (precise contracts)
 
@@ -626,10 +628,11 @@ router.post(
 
 ### Outlet 3 — Feature: `auth`
 
-- [ ] `auth.schema.ts` (signup, login + inferred types)
-- [ ] `auth.service.ts` (bcrypt, 409 email, 401 generic login failure, STUDENT-only signup)
-- [ ] `auth.controller.ts`, `auth.routes.ts` with `authLimiter`
-- [ ] Smoke: `curl` signup/login → 201/200; bad password → 401
+- [x] `auth.schema.ts` (signup, login + inferred types)
+- [x] `auth.service.ts` (bcrypt, 409 email, 401 generic login failure, STUDENT-only signup)
+- [x] `auth.controller.ts`, `auth.routes.ts` with `authLimiter`
+- [x] Smoke: signup → 201, duplicate email → 409, invalid payload → 400 + details, wrong password → 401, unknown email → 401 (identical message), admin login → 200
+- [x] Rate limit verified: 5 allowed → 6th request 429 `RATE_LIMITED`
 
 ### Outlet 4 — Feature: `submissions`
 

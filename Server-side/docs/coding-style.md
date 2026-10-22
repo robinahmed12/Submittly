@@ -103,6 +103,18 @@ Concrete rules:
 
 - A controller calls **exactly one** service function per route.
 - A service takes plain values (already-parsed) as parameters, **not** the `Request` object.
+- **Controllers expose arrow-function properties**, not object methods, so handlers can be passed straight to the router without an unbound `this` (ESLint `unbound-method`):
+
+  ```ts
+  export const authController = {
+    signup: async (req: Request, res: Response): Promise<void> => {
+      const input = signupSchema.parse(req.body);
+      const result = await authService.signup(input);
+      res.status(201).json({ success: true, data: result });
+    },
+  };
+  ```
+
 - A route **first** `authenticate`, **then** `authorize(...roles)`, **then** `submitLimiter`/`authLimiter` when applicable, **then** `validate`, **then** controller — always in that order:
 
   ```ts
@@ -225,6 +237,7 @@ import { submissionService } from './submission.service';
 
 - `process.env` is read **only inside `config/env.ts`** — all other modules import `env`.
 - The one sanctioned exception: `prisma.config.ts` (the Prisma CLI config, outside the app runtime) reads `process.env.DATABASE_URL` directly, because the CLI loads it before any app module exists.
+- **Quote any `.env` value containing `#`** — dotenv treats an unquoted `#` as the start of a comment, silently truncating the value (`ChangeMe#2026` → `ChangeMe`). Use `ADMIN_PASSWORD="ChangeMe#2026"`.
 - `config/env.ts` validates in keys with a Zod schema at boot and fails loudly for missing required vars.
 - `.env` must never be committed; `.env.example` is kept up to date whenever `env.ts` changes.
 - Adding a variable follows this strict order: `env.ts` schema → `.env.example` with clear docs → local `.env` in PR description if needed for ops.
