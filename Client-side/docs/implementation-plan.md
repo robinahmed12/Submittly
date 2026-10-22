@@ -1385,16 +1385,25 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 - [x] Smoke: the already-reviewed race → the client shows the message and the list refetches
 - [x] Smoke: a student token is refused with `403 ROLE_FORBIDDEN`
 - [x] Verified in a real browser (headless Chrome over CDP): 44/44 checks
-- [ ] URL-driven `page` / `limit` / `status` state
+- [x] URL-driven `page` / `limit` / `status` state
 - [x] Smoke: list → 200 with student info; filter → 200; pagination → correct `totalPages`; approve → 200; re-approve → 422 toast; stats reflect the reviews; student token → 403
 
 ### Outlet 6 — Polish, states & accessibility
 
-- [ ] Every view has loading / empty / error / success states
-- [ ] Mobile layout: mentor table becomes cards below `md`
-- [ ] Dark mode toggle wired through `next-themes`
-- [ ] Keyboard navigation, focus rings, labels on every input
-- [ ] `npm run lint` clean; `npm run build` clean; no `any` in app code
+- [x] Every view has loading / empty / error / success states
+  - `/student/dashboard` — skeleton, empty state with a CTA, `error-state` with retry, the list
+  - `/student/submissions/new` — inline field errors, pending submit state
+  - `/mentor/dashboard` — card skeletons, an all-zero empty state, `error-state` with retry
+  - `/mentor/submissions` — table skeleton, two empty states (unfiltered / filtered), `error-state` with retry
+- [x] Error boundaries: `app/error.tsx`, `app/global-error.tsx`, and one per route group (`(auth)`, `(student)`, `(mentor)`), all sharing `components/shared/error-fallback.tsx`
+- [x] `app/not-found.tsx` — a 404 page that offers a way back
+- [x] `loading.tsx` for the student and mentor route groups
+- [x] Mobile layout: the mentor table becomes cards below `md`
+- [x] Dark mode toggle wired through `next-themes`, in the app shell **and** on the signed-out pages
+- [x] `prefers-reduced-motion` respected globally
+- [x] Keyboard navigation, focus rings, labels on every input
+- [x] `npm run lint` clean; `npm run build` clean; no `any` in app code
+- [x] Verified in a real browser (headless Chrome over CDP): 21/21 checks — the 404 page, the theme toggle flipping the theme and surviving a navigation, every form control having an accessible name, Tab reaching the email and password fields with a painted focus ring, the reduced-motion rule, and the table/cards swap at a phone viewport
 
 ### Outlet 7 — Documentation & acceptance
 

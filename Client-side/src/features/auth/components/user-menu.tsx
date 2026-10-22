@@ -1,9 +1,9 @@
 'use client';
 
-import { LogOut, Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { LogOut } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useThemeToggle } from '@/components/shared/theme-toggle';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +28,7 @@ interface UserMenuProps {
  */
 export function UserMenu({ session }: UserMenuProps) {
   const logout = useLogout();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { isDark, toggle } = useThemeToggle();
 
   const initials = session.name
     .split(' ')
@@ -55,10 +55,9 @@ export function UserMenu({ session }: UserMenuProps) {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
-          {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
-          {resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}
-        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={toggle}>
+          {isDark ? 'Light mode' : 'Dark mode'}
+        </DropdownMenuItem>{' '}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"

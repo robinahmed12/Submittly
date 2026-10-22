@@ -254,7 +254,25 @@ A folder gains a new top-level file only when it earns it. Four small files beat
 
 ### 7.1 Error boundaries
 
-Each route group gets an `error.tsx`:
+Each route group gets an `error.tsx`, and the app root gets one too:
+
+```
+src/app/error.tsx              # below the root layout
+src/app/global-error.tsx       # the root layout itself — renders its own html/body
+src/app/(auth)/error.tsx
+src/app/(student)/error.tsx
+src/app/(mentor)/error.tsx
+```
+
+Every one of them is a thin wrapper around `components/shared/error-fallback.tsx`, so the wording and the retry affordance stay consistent. `error.tsx` must be a Client Component and must accept `{ error, reset }`.
+
+`not-found.tsx` gives the 404 page a way back, and `loading.tsx` gives a route group a skeleton while it loads.
+
+### 7.2 Theme
+
+- The theme comes from `next-themes` with the `class` strategy, mounted once in the root layout.
+- **`resolvedTheme` is `undefined` on the server _and_ on the first client render.** It is the hydration-safe signal — render the theme-dependent icon only once it is known, rather than tracking a `mounted` flag with `setState` in an effect (the `react-hooks/set-state-in-effect` rule forbids that).
+- The toggle lives in the app shell **and** on the signed-out pages, so a visitor who has not signed in can still switch modes.
 
 ```tsx
 'use client';
@@ -337,6 +355,8 @@ export default function Error({
 - **Colour is never the only signal.** The status badge carries a text label as well as a colour.
 - **Announce dynamic changes** — use `aria-live="polite"` for toasts and result counts.
 - Images and icons that carry meaning get `alt` or `aria-hidden` appropriately.
+- **Respect `prefers-reduced-motion`.** The global stylesheet already neutralises animation and transitions — do not reintroduce them with inline styles.
+- **Every interactive control has an accessible name.** A `<select>` with a visible `<span>` beside it is not labelled — wrap it in a `<label>` or give it an `aria-label`.
 
 ---
 

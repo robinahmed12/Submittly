@@ -1,5 +1,7 @@
 'use client';
 
+import { Inbox } from 'lucide-react';
+import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { useStats } from '../hooks/use-stats';
 import { StatsCards } from './stats-cards';
@@ -24,5 +26,19 @@ export function StatsOverview() {
     );
   }
 
-  return <StatsCards stats={data?.stats} isPending={isPending} />;
+  const stats = data?.stats;
+
+  return (
+    <div className="space-y-6">
+      <StatsCards stats={stats} isPending={isPending} />
+
+      {!isPending && stats && stats.total === 0 && (
+        <EmptyState
+          icon={<Inbox className="size-8" aria-hidden="true" />}
+          title="No submissions yet"
+          description="Once students start submitting projects, the counts and the review queue will fill up here."
+        />
+      )}
+    </div>
+  );
 }
