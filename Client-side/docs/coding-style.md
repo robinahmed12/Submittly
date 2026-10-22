@@ -302,6 +302,9 @@ export default function Error({
 
 - Use **semantic tokens**, never raw colours: `bg-background`, `text-muted-foreground`, `border-border`, `text-destructive`. Raw `bg-[#1a1a1a]` is banned — it cannot follow dark mode.
 - Custom colours are added as CSS variables in `globals.css` and exposed through `@theme inline`.
+
+  The **brand scale** is the one sanctioned exception to "no numeric scales": `brand-300` … `brand-900` in `globals.css` anchors the four brand colours (`300` = `#FF0000`, `500` = `#BC0202`, `700` = `#830000`, `900` = `#000000`) and is meant for brand chrome — the logo mark, spot illustrations — via utilities like `bg-brand-300`. Every _interactive_ colour still goes through the semantic tokens (`--primary`, `--ring`, `--sidebar-*`), so dark mode stays automatic.
+
 - **Never hard-code spacing or colour values that already exist as a token.** `p-4`, not `p-[16px]`.
 - Layout uses Tailwind's spacing scale; spacing is consistent because the scale is consistent.
 - **shadcn/ui components are the base.** Reach for the existing primitive before writing a new one.
@@ -395,8 +398,10 @@ app/(mentor)  → features/student                          forbidden
 
 - **Cross-feature imports are forbidden.** If two features need the same code, it belongs in `lib/` or `components/shared/`.
 - **Persona boundaries are as hard as feature boundaries.** The mentor shell never imports a student component, and vice versa.
-- **Shared code imports nothing from `features/*` — with one exception: `features/auth`.** The auth feature is cross-cutting: every persona has an account, and the app shell shows the signed-in user. Persona features (`submissions`, `review`) stay off-limits to shared code. If a shared component needs a persona-specific piece, it belongs in a persona folder instead.
+- **Shared code imports nothing from `features/*` — with one exception: `features/auth`.** The auth feature is cross-cutting: every persona has an account, and the shell shows the signed-in user. Persona features (`submissions`, `review`) stay off-limits to shared code. If a shared component needs a persona-specific piece, it belongs in a persona folder instead.
+- **Shared composites take persona specifics as a _slot_, not as data.** The dashboard shell accepts `sidebar: ReactNode`; the persona layout passes its own nav component (`<StudentNav />`, `<MentorNav />`). Besides keeping the boundary clean, this is the only way icons can participate at all — icon components cannot be serialised across the server → client boundary, so a server layout cannot pass nav _data_ (href + icon) down to a client shell. The nav component is `'use client'`, renders its own icons, and reads `usePathname()` for the active state.
 - `src/lib/session-server.ts` is `import 'server-only'` — it must never be pulled into a client bundle. `src/lib/session.ts` is framework-free and safe to import anywhere.
+- `src/hooks/use-mobile.ts` uses `useSyncExternalStore`, not `useState` + `useEffect`. Calling `setState` synchronously inside an effect body is banned (`react-hooks/set-state-in-effect`); external state (media queries, observers, sockets) belongs in `useSyncExternalStore`.
 
 ---
 

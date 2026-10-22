@@ -186,33 +186,35 @@ Written by `shadcn init`. The v4 CLI names styles `<base>-<preset>`; this projec
 
 Tailwind v4 is configured in CSS. There is no `tailwind.config.js`; `components.json` therefore sets `"tailwind.config": ""`.
 
-`shadcn init` writes the file with the full token set — `:root` and `.dark` blocks holding the OKLCH values, an `@theme inline` block mapping them onto Tailwind's colour utilities, and an `@layer base` block applying the defaults. The generated theme is the baseline; **extend it with new tokens rather than hard-coding values in components**.
+`shadcn init` writes the file with the full token set — `:root` and `.dark` blocks, an `@theme inline` block mapping the tokens onto Tailwind's colour utilities, and an `@layer base` block applying the defaults. **Extend it with new tokens rather than hard-coding values in components.**
+
+The generated OKLCH palette has been replaced with the Submittly brand palette (`#FF0000`, `#BC0202`, `#830000`, `#000000`). The four colours are anchored into a Tailwind scale — `brand-300` = `#FF0000`, `brand-500` = `#BC0202`, `brand-700` = `#830000`, `brand-900` = `#000000`, with derived tints/shades between — exposed as utilities such as `bg-brand-500`:
 
 ```css
-@import 'tailwindcss';
-@import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
-
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  /* …every semantic token… */
-  --radius-lg: var(--radius);
+  --color-brand-500: #bc0202; /* the four brand colours plus derived steps */
+  /* …every semantic token maps onto the scale… */
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  /* …light values… */
+  --primary: #bc0202; /* buttons, active nav, focus ring */
+  --destructive: #ff0000; /* destructive actions */
+  --sidebar: #000000; /* the sidebar is black in both themes */
+  --sidebar-primary: #bc0202; /* active nav item */
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  /* …dark values… */
+  --primary: #830000; /* the deep red reads better on dark */
+  --ring: #ff0000;
 }
+```
+
+Fonts come from `next/font/google`: **Raleway** (`--font-raleway`) for sans/heading, **Geist Mono** (`--font-geist-mono`) for mono. The font tokens in `@theme inline` point at those variables:
+
+```css
+--font-sans: var(--font-raleway);
+--font-heading: var(--font-raleway);
+--font-mono: var(--font-geist-mono);
 ```
 
 ### 2.6 Form primitives — `<Field>`, not `<Form>`
@@ -270,7 +272,7 @@ Client-side/
 │   ├── app/
 │   │   ├── layout.tsx                       # root: fonts, providers, Toaster
 │   │   ├── globals.css                      # Tailwind v4 + theme tokens
-│   │   ├── page.tsx                         # landing → redirect by role
+│   │   ├── page.tsx                         # redirect: /login, or the role home
 │   │   ├── (auth)/
 │   │   │   ├── login/page.tsx
 │   │   │   └── signup/page.tsx
@@ -290,8 +292,9 @@ Client-side/
 │   ├── components/
 │   │   ├── ui/                              # shadcn — generated, do not edit
 │   │   ├── shared/                          # app-wide composites
-│   │   │   ├── app-shell.tsx
+│   │   │   ├── dashboard-shell.tsx          # SaaS shell: sidebar + top bar (nav is a slot)
 │   │   │   ├── empty-state.tsx
+│   │   │   ├── error-fallback.tsx
 │   │   │   ├── error-state.tsx
 │   │   │   ├── loading-skeleton.tsx
 │   │   │   ├── page-header.tsx
@@ -318,7 +321,8 @@ Client-side/
 │   │   │   ├── components/
 │   │   │   │   ├── submission-form.tsx
 │   │   │   │   ├── submission-card.tsx
-│   │   │   │   └── submission-list.tsx
+│   │   │   │   ├── submission-list.tsx
+│   │   │   │   └── student-nav.tsx           # client: sidebar menu + icons + active state
 │   │   │   ├── hooks/
 │   │   │   │   ├── use-create-submission.ts
 │   │   │   │   └── use-my-submissions.ts
@@ -328,6 +332,7 @@ Client-side/
 │   │   └── review/
 │   │       ├── api.ts
 │   │       ├── components/
+│   │       │   ├── mentor-nav.tsx            # client: sidebar menu + icons + active state
 │   │       │   ├── pagination.tsx
 │   │       │   ├── review-dialog.tsx
 │   │       │   ├── stats-cards.tsx
@@ -346,6 +351,8 @@ Client-side/
 │   │   ├── session.ts                       # cookie names, Session type, parsing (framework-free)
 │   │   ├── session-server.ts                # server-only: getSession() / clearSession()
 │   │   └── utils.ts                         # cn()
+│   ├── hooks/
+│   │   └── use-mobile.ts                    # useSyncExternalStore (§5.6)
 │   ├── providers/
 │   │   ├── query-provider.tsx
 │   │   └── theme-provider.tsx
@@ -829,14 +836,19 @@ export async function clearSession(): Promise<void>;
 
 App-wide composites only. Feature-specific components live in `features/*/components/`.
 
-| Component              | Purpose                                                     |
-| ---------------------- | ----------------------------------------------------------- |
-| `app-shell.tsx`        | Page chrome: header, nav, main container, `max-w-7xl`       |
-| `page-header.tsx`      | Title + description + action slot                           |
-| `loading-skeleton.tsx` | Placeholder blocks that match the shape of the real content |
-| `empty-state.tsx`      | Icon + title + description + optional action                |
-| `error-state.tsx`      | Message + retry button                                      |
-| `status-badge.tsx`     | `PENDING` / `APPROVED` / `REJECTED` → colour + label        |
+| Component              | Purpose                                                                                                                                                                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard-shell.tsx`  | SaaS shell: black sidebar + top bar + page container. The sidebar nav is a _slot_ (`sidebar: ReactNode`) because icon components cannot cross the server → client boundary (§12 #15). Imports `features/auth` — the one allowed exception |
+| `theme-toggle.tsx`     | Light/dark switch, in the top bar and on the signed-out pages                                                                                                                                                                             |
+| `page-header.tsx`      | Title + description + action slot                                                                                                                                                                                                         |
+| `loading-skeleton.tsx` | Placeholder blocks that match the shape of the real content                                                                                                                                                                               |
+| `empty-state.tsx`      | Icon + title + description + optional action                                                                                                                                                                                              |
+| `error-state.tsx`      | Message + retry button                                                                                                                                                                                                                    |
+| `status-badge.tsx`     | `PENDING` / `APPROVED` / `REJECTED` → colour + label                                                                                                                                                                                      |
+
+### 5.6 `src/hooks/use-mobile.ts`
+
+shadcn's stock `useIsMobile` calls `setState` inside the effect body, which `react-hooks/set-state-in-effect` forbids. Our version uses `useSyncExternalStore` instead: the media query is external state, the client snapshot is `window.innerWidth < 768`, the server snapshot is `false`, and there is no effect at all. The return type is therefore `boolean` (never `undefined`).
 
 ---
 
@@ -1217,19 +1229,19 @@ The browser calls `/api/backend/<path>`; the proxy forwards to `<API_URL>/api/<p
 
 ## 8. Routing Map
 
-| Route                      | Access            | Page                    | Server Component | Client Islands                    |
-| -------------------------- | ----------------- | ----------------------- | ---------------- | --------------------------------- |
-| `/`                        | public            | Landing / role redirect | ✅               | —                                 |
-| `/login`                   | public            | Sign in                 | ✅               | Login form                        |
-| `/signup`                  | public            | Register                | ✅               | Signup form                       |
-| `/student/dashboard`       | `STUDENT`         | My submissions          | ✅ (shell)       | Submission list                   |
-| `/student/submissions/new` | `STUDENT`         | New submission          | ✅               | Submission form                   |
-| `/mentor/dashboard`        | `MENTOR`, `ADMIN` | Statistics              | ✅ (shell)       | Stats cards                       |
-| `/mentor/submissions`      | `MENTOR`, `ADMIN` | Review table            | ✅ (shell)       | Table, filter, pagination, dialog |
+| Route                      | Access            | Page                                      | Server Component | Client Islands                    |
+| -------------------------- | ----------------- | ----------------------------------------- | ---------------- | --------------------------------- |
+| `/`                        | public            | Redirect only — no landing page (§12 #10) | ✅               | —                                 |
+| `/login`                   | public            | Sign in                                   | ✅               | Login form                        |
+| `/signup`                  | public            | Register                                  | ✅               | Signup form                       |
+| `/student/dashboard`       | `STUDENT`         | My submissions                            | ✅ (shell)       | Submission list                   |
+| `/student/submissions/new` | `STUDENT`         | New submission                            | ✅               | Submission form                   |
+| `/mentor/dashboard`        | `MENTOR`, `ADMIN` | Statistics                                | ✅ (shell)       | Stats cards                       |
+| `/mentor/submissions`      | `MENTOR`, `ADMIN` | Review table                              | ✅ (shell)       | Table, filter, pagination, dialog |
 
 Route groups `(auth)`, `(student)`, and `(mentor)` do **not** appear in the URL.
 
-**`/` behaviour:** read the session cookie server-side. No session → show a public landing page with "Sign in" / "Create account". Session → `redirect(roleHome(role))`.
+**`/` behaviour:** `redirect(session ? roleHome(role) : '/login')`. The session is read server-side, so the redirect happens before anything paints — a signed-out visitor lands on the sign-in page, a signed-in one on their dashboard.
 
 ---
 
@@ -1237,13 +1249,26 @@ Route groups `(auth)`, `(student)`, and `(mentor)` do **not** appear in the URL.
 
 **shadcn components to use**
 
-| Need     | Component                                                |
-| -------- | -------------------------------------------------------- |
-| Forms    | `Field` family, `Input`, `Textarea`, `Select` (see §2.6) |
-| Layout   | `Card`, `Separator`, `Tabs`                              |
-| Data     | `Table`, `Badge`, `Pagination`, `Skeleton`               |
-| Feedback | `Alert`, `Dialog`, `DropdownMenu`, `Avatar`              |
-| Actions  | `Button`                                                 |
+| Need     | Component                                                       |
+| -------- | --------------------------------------------------------------- |
+| Forms    | `Field` family, `Input`, `Textarea`, `Select` (see §2.6)        |
+| Layout   | `Card`, `Separator`, `Tabs`, `Sidebar` (the dashboard shell)    |
+| Data     | `Table`, `Badge`, `Pagination`, `Skeleton`                      |
+| Feedback | `Alert`, `Dialog`, `DropdownMenu`, `Avatar`, `Tooltip`, `Sheet` |
+| Actions  | `Button`                                                        |
+
+**Brand palette** — the four Submittly colours, anchored into a Tailwind scale in `globals.css` (§2.5):
+
+| Colour    | Scale       | Where it appears                                  |
+| --------- | ----------- | ------------------------------------------------- |
+| `#FF0000` | `brand-300` | Logo mark, `destructive`, dark-mode focus ring    |
+| `#BC0202` | `brand-500` | `primary` (buttons, active nav), light focus ring |
+| `#830000` | `brand-700` | Dark-mode `primary`, hover shades                 |
+| `#000000` | `brand-900` | Text, the sidebar background                      |
+
+The dashboard chrome is **"red brand, black chrome"**: a black sidebar (`--sidebar: #000000`) with white text and `#BC0202` for the active item, over white page surfaces. The sidebar is black in both themes.
+
+**Typography** — Raleway via `next/font/google` for sans/heading, Geist Mono for mono (§2.5).
 
 **Status badge colour mapping** (in `components/shared/status-badge.tsx`)
 
@@ -1412,23 +1437,38 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 - [ ] Every item of **Requirements §10 Testing Checklist** verified manually in the browser
 - [ ] Seeded data: a few students, submissions in each status, and a mentor account (`npm run prisma:seed` on the server)
 
+### Outlet 8 — Brand theme & SaaS dashboard shell _(added post-plan)_
+
+- [x] Brand palette in `globals.css`: `#FF0000` / `#BC0202` / `#830000` / `#000000` anchored into a `brand-*` Tailwind scale, semantic tokens remapped, black sidebar in both themes (§2.5)
+- [x] Raleway via `next/font/google` for sans/heading (§12 #17)
+- [x] Landing page removed — `/` redirects to `/login` or the role home (§12 #10)
+- [x] `npx shadcn add sidebar` — re-downloaded `button`, `separator`, `input`, `skeleton`; added `sidebar`, `tooltip`, `sheet`, `hooks/use-mobile` (§5.6); `TooltipProvider` in the root layout
+- [x] `components/shared/dashboard-shell.tsx` — `SidebarProvider` + collapsible icon sidebar (brand mark header, nav slot, role footer, rail) + top bar (`SidebarTrigger`, wordmark, theme toggle, user menu)
+- [x] Persona navs as client slots: `features/submissions/components/student-nav.tsx`, `features/review/components/mentor-nav.tsx` (§12 #15)
+- [x] Persona layouts carry a second role check; old `app-shell.tsx` deleted
+- [x] `(auth)` layout carries the brand mark; `not-found.tsx` copy updated for the `/` → `/login` flow
+- [x] `lint` / `typecheck` / `build` clean
+
 ---
 
 ## 12. Open Decisions Log
 
-| #   | Area                      | Decision                                                                           | Notes                                                                                                                                                                                                                                                                                                                                                                               |
-| --- | ------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Token storage             | httpOnly `submittly_token` cookie + server-side proxy                              | The token never reaches browser JS; CORS is never exercised                                                                                                                                                                                                                                                                                                                         |
-| 2   | Role gating               | Separate httpOnly `submittly_session` cookie, read by `src/proxy.ts`               | Holds no secret; avoids re-verifying the JWT on every navigation                                                                                                                                                                                                                                                                                                                    |
-| 3   | Middleware naming         | `src/proxy.ts` (not `middleware.ts`)                                               | Next.js 16 renamed the convention; `middleware.ts` is deprecated                                                                                                                                                                                                                                                                                                                    |
-| 4   | Server state              | TanStack Query v5                                                                  | Cache, invalidation, and explicit states without hand-rolled `useEffect` fetching                                                                                                                                                                                                                                                                                                   |
-| 5   | Rendering                 | Server Components by default; `'use client'` only on interactive islands           | Matches Next.js guidance and keeps the JS payload small                                                                                                                                                                                                                                                                                                                             |
-| 6   | Pagination & filter state | `searchParams` (URL-driven)                                                        | Shareable URLs, working back button, server stays authoritative                                                                                                                                                                                                                                                                                                                     |
-| 7   | Pagination UI             | shadcn `Table` + `Pagination` — no `@tanstack/react-table`                         | The table needs no client-side sorting or row selection                                                                                                                                                                                                                                                                                                                             |
-| 8   | Schema sharing            | **Duplicate** the server's Zod schemas in `features/*/schemas.ts`                  | A shared package would need a monorepo; duplication is the smaller change. **Risk: drift.** Mitigation — the server and client schemas live in adjacent files with identical constraint text, and any server-side rule change updates both in the same PR. Revisit if a third consumer appears.                                                                                     |
-| 9   | Review comment            | Optional, in the confirm dialog, max 1000 characters                               | Matches the server's `updateStatusSchema` exactly                                                                                                                                                                                                                                                                                                                                   |
-| 10  | Landing page              | Redirect straight to the role home when signed in; otherwise a minimal public page | Keeps the route table small while still giving signed-out users a way in                                                                                                                                                                                                                                                                                                            |
-| 11  | Cache Components          | `cacheComponents` **off**; `partialPrefetching` unset                              | Enabling Cache Components is not a rename-only change — it requires adopting the Cache Components model and surfaces build errors for uncached data outside `<Suspense>`. `partialPrefetching` throws at config validation without it. The app reads cookies for the session and leans on TanStack Query, so the default dynamic model is the predictable fit. Revisit in Outlet 6. |
-| 12  | Form primitives           | shadcn v4 `<Field>` family + react-hook-form `<Controller>`                        | shadcn v4 removed the old `Form` component. `Field` gives explicit control over markup while keeping accessibility (`data-invalid`, `aria-invalid`, `FieldError`) — see §2.6                                                                                                                                                                                                        |
-| 13  | Radix packaging           | The unified `radix-ui` package, not individual `@radix-ui/*`                       | This is what shadcn v4 installs; matching it avoids duplicate primitives                                                                                                                                                                                                                                                                                                            |
-| 14  | `effect` peer conflict    | Pinned via `package.json` `overrides`                                              | `@hookform/resolvers@6` declares an optional `effect@^4` peer that contradicts the `@typeschema` chain's `effect@^3`. The zod resolver never touches `effect`. Using `--legacy-peer-deps` instead would disable peer checking project-wide.                                                                                                                                         |
+| #   | Area                      | Decision                                                                               | Notes                                                                                                                                                                                                                                                                                                                                                                               |
+| --- | ------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Token storage             | httpOnly `submittly_token` cookie + server-side proxy                                  | The token never reaches browser JS; CORS is never exercised                                                                                                                                                                                                                                                                                                                         |
+| 2   | Role gating               | Separate httpOnly `submittly_session` cookie, read by `src/proxy.ts`                   | Holds no secret; avoids re-verifying the JWT on every navigation                                                                                                                                                                                                                                                                                                                    |
+| 3   | Middleware naming         | `src/proxy.ts` (not `middleware.ts`)                                                   | Next.js 16 renamed the convention; `middleware.ts` is deprecated                                                                                                                                                                                                                                                                                                                    |
+| 4   | Server state              | TanStack Query v5                                                                      | Cache, invalidation, and explicit states without hand-rolled `useEffect` fetching                                                                                                                                                                                                                                                                                                   |
+| 5   | Rendering                 | Server Components by default; `'use client'` only on interactive islands               | Matches Next.js guidance and keeps the JS payload small                                                                                                                                                                                                                                                                                                                             |
+| 6   | Pagination & filter state | `searchParams` (URL-driven)                                                            | Shareable URLs, working back button, server stays authoritative                                                                                                                                                                                                                                                                                                                     |
+| 7   | Pagination UI             | shadcn `Table` + `Pagination` — no `@tanstack/react-table`                             | The table needs no client-side sorting or row selection                                                                                                                                                                                                                                                                                                                             |
+| 8   | Schema sharing            | **Duplicate** the server's Zod schemas in `features/*/schemas.ts`                      | A shared package would need a monorepo; duplication is the smaller change. **Risk: drift.** Mitigation — the server and client schemas live in adjacent files with identical constraint text, and any server-side rule change updates both in the same PR. Revisit if a third consumer appears.                                                                                     |
+| 9   | Review comment            | Optional, in the confirm dialog, max 1000 characters                                   | Matches the server's `updateStatusSchema` exactly                                                                                                                                                                                                                                                                                                                                   |
+| 10  | Landing page              | **None** — `/` is a redirect only: signed out → `/login`, signed in → `roleHome(role)` | The product has no marketing surface; the sign-in page _is_ the entry point. `not-found.tsx` links to `/`, which now lands on `/login`                                                                                                                                                                                                                                              |
+| 11  | Cache Components          | `cacheComponents` **off**; `partialPrefetching` unset                                  | Enabling Cache Components is not a rename-only change — it requires adopting the Cache Components model and surfaces build errors for uncached data outside `<Suspense>`. `partialPrefetching` throws at config validation without it. The app reads cookies for the session and leans on TanStack Query, so the default dynamic model is the predictable fit. Revisit in Outlet 6. |
+| 12  | Form primitives           | shadcn v4 `<Field>` family + react-hook-form `<Controller>`                            | shadcn v4 removed the old `Form` component. `Field` gives explicit control over markup while keeping accessibility (`data-invalid`, `aria-invalid`, `FieldError`) — see §2.6                                                                                                                                                                                                        |
+| 13  | Radix packaging           | The unified `radix-ui` package, not individual `@radix-ui/*`                           | This is what shadcn v4 installs; matching it avoids duplicate primitives                                                                                                                                                                                                                                                                                                            |
+| 14  | `effect` peer conflict    | Pinned via `package.json` `overrides`                                                  | `@hookform/resolvers@6` declares an optional `effect@^4` peer that contradicts the `@typeschema` chain's `effect@^3`. The zod resolver never touches `effect`. Using `--legacy-peer-deps` instead would disable peer checking project-wide.                                                                                                                                         |
+| 15  | Sidebar nav architecture  | The shell takes the nav as a **React element slot** (`sidebar: ReactNode`), not data   | Icon components cannot be serialised across the server → client boundary, so nav data (href + icon) cannot live in a server layout. Each persona feature owns a small `'use client'` component (`student-nav.tsx`, `mentor-nav.tsx`) that renders its own `SidebarMenu`, icons, and `usePathname` active state. The shared shell stays persona-agnostic.                            |
+| 16  | `useIsMobile` hook        | Replaced shadcn's `useState`+`useEffect` version with `useSyncExternalStore`           | shadcn's stock hook calls `setState` inside the effect body, which `react-hooks/set-state-in-effect` forbids. The hook is in `src/hooks/`, not `src/components/ui/`, so rewriting it does not violate the "do not edit generated ui components" rule (§5.6).                                                                                                                        |
+| 17  | Typography                | **Raleway** (`next/font/google`) for sans/heading; Geist Mono for mono                 | User-selected brand font. Font tokens in `globals.css` point at the `next/font` CSS variables (§2.5)                                                                                                                                                                                                                                                                                |

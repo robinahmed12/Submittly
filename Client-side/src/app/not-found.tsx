@@ -8,10 +8,10 @@ export default function NotFound() {
       <p className="text-muted-foreground text-sm font-medium tracking-widest uppercase">404</p>
       <h1 className="text-3xl font-semibold tracking-tight">This page does not exist</h1>
       <p className="text-muted-foreground max-w-md">
-        The link may be out of date, or the page may have moved. Head back to Submittly to carry on.
+        The link may be out of date, or the page may have moved. Sign in to carry on.
       </p>
       <Button asChild className="mt-2">
-        <Link href="/">Back to Submittly</Link>
+        <Link href="/">Back to sign in</Link>
       </Button>
     </main>
   );
