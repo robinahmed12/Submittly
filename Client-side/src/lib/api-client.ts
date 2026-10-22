@@ -95,7 +95,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   // A 401 means the token expired or was rejected. Tear the session down
   // before throwing, so the caller never has to think about it.
-  if (response.status === 401) {
+  //
+  // The auth endpoints are the exception: a failed sign-in/sign-up attempts
+  // returns 401 while the user is already signed out, so there is no session
+  // to tear down and the hard navigation would only reload the page and
+  // destroy the inline failure feedback.
+  if (response.status === 401 && !path.startsWith('/auth/')) {
     await endSession();
   }
 

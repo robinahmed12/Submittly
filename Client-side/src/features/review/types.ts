@@ -20,14 +20,3 @@ export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 export const MAX_PAGE_SIZE = 50;
 
 export const DEFAULT_PAGE_SIZE = 10;
-
-/** The status filter values, including the "no filter" option. */
-export const STATUS_FILTER_OPTIONS: ReadonlyArray<{
-  value: SubmissionStatus | 'ALL';
-  label: string;
-}> = [
-  { value: 'ALL', label: 'All statuses' },
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'REJECTED', label: 'Rejected' },
-];

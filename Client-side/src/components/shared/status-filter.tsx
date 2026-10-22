@@ -8,7 +8,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { SubmissionStatus } from '@/types/api';
-import { STATUS_FILTER_OPTIONS } from '../types';
+
+/** The status filter values, including the "no filter" option. */
+export const STATUS_FILTER_OPTIONS: ReadonlyArray<{
+  value: SubmissionStatus | 'ALL';
+  label: string;
+}> = [
+  { value: 'ALL', label: 'All statuses' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'REJECTED', label: 'Rejected' },
+];
 
 interface StatusFilterProps {
   value: SubmissionStatus | 'ALL';
@@ -17,10 +27,11 @@ interface StatusFilterProps {
 }
 
 /**
- * The server-side status filter.
+ * The status filter, shared by every submission list.
  *
- * Changing it resets the page to 1 — a filtered list is a new list, and
- * page 4 of the previous filter is meaningless.
+ * Moved here from `features/review` once the student list needed the same
+ * control — shared code cannot import from a feature, so the control had to
+ * move up, not be duplicated (see coding-style.md §10.1).
  */
 export function StatusFilter({ value, onChange, disabled }: StatusFilterProps) {
   return (

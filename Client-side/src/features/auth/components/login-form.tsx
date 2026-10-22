@@ -2,12 +2,14 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { applyAuthError } from '../form-error';
 import { useLogin } from '../hooks/use-login';
+import { DEMO_ACCOUNTS, type DemoAccount } from '../demo-accounts';
 import { loginSchema, type LoginInput } from '../schemas';
 
 interface LoginFormProps {
@@ -24,6 +26,9 @@ interface LoginFormProps {
 export function LoginForm({ nextPath }: LoginFormProps) {
   const login = useLogin(nextPath);
 
+  /** Which demo button is mid-flight, so only it shows the loading label. */
+  const [pendingDemo, setPendingDemo] = useState<string | null>(null);
+
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -32,8 +37,23 @@ export function LoginForm({ nextPath }: LoginFormProps) {
 
   function onSubmit(values: LoginInput) {
     login.reset();
+    setPendingDemo(null);
     login.mutate(values, {
       onError: error => applyAuthError(error, form),
+    });
+  }
+
+  /** One-click sign-in: fill the visible form so the state is transparent, then submit. */
+  function onDemoLogin(account: DemoAccount) {
+    form.setValue('email', account.email);
+    form.setValue('password', account.password);
+    setPendingDemo(account.label);
+    login.reset();
+    login.mutate(account, {
+      onError: error => {
+        setPendingDemo(null);
+        applyAuthError(error, form);
+      },
     });
   }
 
@@ -71,6 +91,31 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           {login.isPending ? 'Signing in…' : 'Sign in'}
         </Button>
       </FieldGroup>
+
+      <div className="mt-8">
+        <div className="flex items-center gap-3" aria-hidden="true">
+          <div className="bg-border h-px flex-1" />
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            or explore with a demo
+          </span>
+          <div className="bg-border h-px flex-1" />
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          {DEMO_ACCOUNTS.map(account => (
+            <Button
+              key={account.label}
+              type="button"
+              variant="outline"
+              disabled={login.isPending}
+              onClick={() => onDemoLogin(account)}
+            >
+              <account.icon aria-hidden="true" />
+              {pendingDemo === account.label ? 'Signing in…' : account.label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
       <p className="text-muted-foreground mt-6 text-center text-sm">
         No account yet?{' '}
