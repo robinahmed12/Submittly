@@ -6,6 +6,8 @@ import { errorHandler } from '@/middlewares/error-handler';
 import { notFoundHandler } from '@/middlewares/not-found';
 import { globalLimiter } from '@/middlewares/rate-limiter';
 import { authRouter } from '@/features/auth/auth.routes';
+import { reviewRouter } from '@/features/review/review.routes';
+import { submissionRouter } from '@/features/submissions/submission.routes';
 
 /**
  * Express app factory — middleware chain composed in the documented order
@@ -41,7 +43,7 @@ export function createApp(): Express {
 
   // Feature routers mount here across Phases 3–5:
   app.use('/api/auth', authRouter); // Phase 3
-  //   app.use('/api/submissions', submissionsRouter); (Phase 4)
+  app.use('/api/submissions', submissionRouter); // Phase 4
   //   app.use('/api/mentor', reviewRouter);        (Phase 5)
 
   app.use(notFoundHandler);
