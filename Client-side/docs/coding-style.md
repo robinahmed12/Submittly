@@ -179,6 +179,19 @@ A folder gains a new top-level file only when it earns it. Four small files beat
 - Every input has a `<FieldLabel>` bound with `htmlFor`, and every error has `aria-describedby` pointing at the message.
 - **`form.watch()` is banned.** The React Compiler cannot memoise it safely (`react-hooks/incompatible-library` fires). Use `useWatch({ control, name })` for a live field value.
 - A failed request maps onto the form through the feature's error helper — `applyAuthError` for auth — never by hand-rolling `setError` calls in each component.
+- **A schema that transforms has two types.** Use `z.input` for the form's field values and `z.output` for the payload, and give `useForm` all three generics:
+
+  ```ts
+  export type FormValues = z.input<typeof schema>; // what the inputs hold
+  export type Payload = z.output<typeof schema>; // what the API receives
+
+  const form = useForm<FormValues, unknown, Payload>({ resolver: zodResolver(schema) });
+  ```
+
+  Getting this wrong shows up as a `Resolver` type error — the resolver's input type is the schema's **input**, not its output.
+
+- **In a Zod pipeline, `.optional()` must come before `.transform()`.** `z.string().trim().transform(...)` rejects `undefined` before the transform ever runs, so an absent field reports a bogus "expected string" error.
+- An optional field that the server treats as "omitted, not empty" must be `undefined` before it is sent — `JSON.stringify` then drops the key entirely. Sending `''` is not the same as omitting it.
 
 ---
 

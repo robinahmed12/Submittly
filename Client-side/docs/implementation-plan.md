@@ -954,37 +954,65 @@ const httpUrlSchema = z
   .url('Please provide a valid URL')
   .refine(url => /^https?:\/\//i.test(url), 'URL must start with http:// or https://');
 
+/**
+ * An optional URL field.
+ *
+ * The server's schema is `z.string().trim().pipe(httpUrlSchema).optional()`,
+ * which treats an **omitted** key as absent but an empty string as an
+ * invalid URL. A blank input must therefore become `undefined` before it is
+ * sent — `JSON.stringify` then drops the key entirely.
+ *
+ * The order matters: `.optional()` has to come **before** the transform, or
+ * `z.string()` rejects `undefined` before the transform ever runs and the
+ * field reports a bogus "expected string" error.
+ */
+const optionalHttpUrlSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value): string | undefined => (value === '' ? undefined : value))
+  .pipe(httpUrlSchema.optional());
+
 export const createSubmissionSchema = z.object({
-  projectName: z
-    .string()
-    .trim()
-    .min(3, 'Project name must be at least 3 characters')
-    .max(120, 'Project name must be at most 120 characters'),
+  projectName: z.string().trim().min(3, '...').max(120, '...'),
   repoUrl: z.string().trim().pipe(httpUrlSchema),
-  liveUrl: z.string().trim().pipe(httpUrlSchema).optional(),
-  description: z
-    .string()
-    .trim()
-    .min(10, 'Description must be at least 10 characters')
-    .max(4000, 'Description must be at most 4000 characters'),
+  liveUrl: optionalHttpUrlSchema,
+  description: z.string().trim().min(10, '...').max(4000, '...'),
 });
-export type CreateSubmissionInput = z.infer<typeof createSubmissionSchema>;
+
+/** The form's field values — what the inputs hold. `liveUrl` is a string. */
+export type CreateSubmissionFormValues = z.input<typeof createSubmissionSchema>;
+
+/** The validated payload sent to the API — a blank `liveUrl` is `undefined`. */
+export type CreateSubmissionInput = z.output<typeof createSubmissionSchema>;
 ```
+
+Because the schema transforms, the form's values and the payload it produces are **different types**. React Hook Form's three generics keep them apart:
+
+```ts
+const form = useForm<CreateSubmissionFormValues, unknown, CreateSubmissionInput>({
+  resolver: zodResolver(createSubmissionSchema),
+  defaultValues: { projectName: '', repoUrl: '', liveUrl: '', description: '' },
+  mode: 'onBlur',
+});
+```
+
+**`submissions/repo-url.ts`** — a client-side mirror of the server's `lib/repo-url.ts`, used only to warn the student early that a repository URL is already in their list. The authoritative check is the database unique constraint.
 
 **`use-my-submissions.ts`**
 
 ```ts
-export const mySubmissionsQueryKey = ['submissions', 'me'] as const;
-
 export function useMySubmissions() {
   return useQuery({
-    queryKey: mySubmissionsQueryKey,
-    queryFn: () => apiFetch<SubmissionList>('/submissions/me'),
+    queryKey: submissionKeys.mine(),
+    queryFn: () => listMySubmissions(),
   });
 }
 ```
 
 **`/student/dashboard`** — the student's own submissions.
+
+The page is a Server Component that renders `<MySubmissions />`, a client component that owns the four states:
 
 | State                 | Rendering                                                                                                                                                 |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1300,12 +1328,18 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 
 ### Outlet 4 — Feature: `submissions` (Student Portal)
 
-- [ ] `features/submissions/{schemas,keys,api,types}.ts`
-- [ ] `features/submissions/hooks/use-my-submissions.ts`, `use-create-submission.ts`
-- [ ] `features/submissions/components/{submission-form,submission-list,submission-card}.tsx`
-- [ ] `app/(student)/student/layout.tsx`, `dashboard/page.tsx`, `submissions/new/page.tsx`
-- [ ] `components/shared/{empty-state,error-state,loading-skeleton,status-badge}.tsx`
-- [ ] Smoke: create → 201 → dashboard shows the new `PENDING` row; duplicate repo → 409 inline, form preserved; invalid URL → 400 mapped to `repoUrl`; empty dashboard → empty state
+- [x] `features/submissions/{schemas,keys,api,repo-url}.ts`
+- [x] `features/submissions/hooks/use-my-submissions.ts`, `use-create-submission.ts`
+- [x] `features/submissions/components/{submission-form,submission-list,submission-card,my-submissions}.tsx`
+- [x] `app/(student)/student/submissions/new/page.tsx`; the dashboard now renders the real list
+- [x] `components/shared/{empty-state,error-state,loading-skeleton,status-badge}.tsx`
+- [x] Smoke: create → 201 → the dashboard lists the new `PENDING` row
+- [x] Smoke: a duplicate repo URL for the same student → 409 inline, the form stays populated
+- [x] Smoke: the same repo URL for a **different** student → 201 (the rule is per student)
+- [x] Smoke: an invalid URL → 400 with `details[]` on `repoUrl`
+- [x] Smoke: a blank `liveUrl` is omitted from the payload, not sent as an empty string
+- [x] Smoke: an empty dashboard shows the empty state with its CTA
+- [x] Verified in a real browser (headless Chrome over CDP): 25/25 checks, including the client-side fetch, the inline errors, and sign-out
 
 ### Outlet 5 — Feature: `review` (Mentor Dashboard)
 

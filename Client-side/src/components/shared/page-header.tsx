@@ -2,9 +2,9 @@ import type { ReactNode } from 'react';
 
 interface PageHeaderProps {
   title: string;
-  description?: string;
+  description?: string | undefined;
   /** An action rendered on the right — usually a button or a link. */
-  action?: ReactNode;
+  action?: ReactNode | undefined;
 }
 
 /** The heading block at the top of a page. */
