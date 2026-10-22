@@ -306,8 +306,11 @@ Client-side/
 │   │   │   │   └── user-menu.tsx
 │   │   │   ├── hooks/
 │   │   │   │   ├── use-login.ts
+│   │   │   │   ├── use-logout.ts
 │   │   │   │   └── use-signup.ts
+│   │   │   ├── form-error.ts                # maps an API failure onto form fields
 │   │   │   ├── keys.ts                      # query-key factory
+│   │   │   ├── roles.ts                     # roleHome / roleLabel / safeNextPath
 │   │   │   ├── schemas.ts                   # Zod (mirrors server rules)
 │   │   │   └── types.ts
 │   │   ├── submissions/
@@ -365,13 +368,15 @@ Route groups (`(auth)`, `(student)`, `(mentor)`) organise files **without** affe
 ```
 features/* → { lib/*, components/shared/*, types/* }     allowed
 features/A → features/B                                   forbidden
-components/shared → features/*                            forbidden
+components/shared → features/*                            forbidden — except features/auth
 components/ui → features/*                                forbidden
 app/(student) → features/mentor                           forbidden
 app/(mentor)  → features/student                          forbidden
 ```
 
 The persona boundary is as hard as the feature boundary: the mentor shell must never import a student component.
+
+**The one exception: `components/shared → features/auth`.** The auth feature is cross-cutting — every persona has an account, and the app shell shows the signed-in user — so the shared app shell may use `features/auth`. Persona features (`submissions`, `review`) remain off-limits to shared code. If a shared component ever needs a persona-specific piece, that is a sign the component belongs in a persona folder instead.
 
 ---
 
@@ -599,9 +604,15 @@ export interface AuthUser {
   createdAt: string;
 }
 
+/**
+ * The auth response the browser receives.
+ *
+ * The API returns `{ user, token }`, but the backend proxy strips the token
+ * and delivers it as the `submittly_token` httpOnly cookie — so the browser
+ * only ever sees the user.
+ */
 export interface AuthPayload {
   user: AuthUser;
-  token: string;
 }
 
 export interface Submission {
@@ -870,35 +881,67 @@ export type SignupInput = z.infer<typeof signupSchema>;
 
 > These constraints are **copies** of the server's. When the server changes a rule, change it here in the same PR — see Open Decisions Log #8.
 
+**`auth/roles.ts`** — role → route mapping, plus the open-redirect guard.
+
+```ts
+export function roleHome(role: Role): string;
+export function roleLabel(role: Role): string;
+
+/**
+ * Validates a `?next=` redirect target.
+ * Only same-origin, absolute paths are allowed. `//evil.com` and
+ * `https://evil.com` are rejected.
+ */
+export function safeNextPath(next: string | undefined): string | null;
+```
+
+`/login?next=…` is validated **server-side** in the page, so the client only ever receives a path that is already known to be same-origin. The hostile value is never rendered into a link.
+
 **`auth/hooks/use-login.ts`**
 
 ```ts
-export function useLogin() {
+export function useLogin(nextPath?: string | null) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: LoginInput) =>
-      apiFetch<AuthPayload>('/auth/login', { method: 'POST', body: JSON.stringify(input) }),
+    mutationFn: (input: LoginInput) => login(input),
     onSuccess: ({ user }) => {
       queryClient.clear(); // a new identity invalidates every cached query
-      router.push(roleHome(user.role));
+      router.push(nextPath ?? roleHome(user.role));
+      router.refresh();
     },
   });
 }
 ```
 
-`use-signup.ts` is identical except it posts to `/auth/signup` and always routes to `/student/dashboard`.
+`use-signup.ts` is identical except it posts to `/auth/signup` and always routes to `/student/dashboard`. `use-logout.ts` calls `DELETE /api/session`, clears the query cache, and routes to `/login`.
+
+**`auth/form-error.ts`** — one helper that maps a failed request onto the form:
+
+```ts
+export function applyAuthError<T extends FieldValues>(
+  error: unknown,
+  form: UseFormReturn<T>,
+  fieldFor?: Partial<Record<ApiErrorCode, Path<T>>>,
+): void;
+```
+
+- `details[]` from the API map onto fields by `path`.
+- A code listed in `fieldFor` (e.g. `EMAIL_ALREADY_EXISTS → 'email'`) maps onto that field.
+- Everything else becomes a toast.
 
 **Behaviour**
 
 | Case                      | Result                                                                              |
 | ------------------------- | ----------------------------------------------------------------------------------- |
 | Invalid credentials       | 401 → toast "Invalid email or password." Form values preserved.                     |
-| Duplicate email on signup | 409 `EMAIL_ALREADY_EXISTS` → toast under the email field.                           |
+| Duplicate email on signup | 409 `EMAIL_ALREADY_EXISTS` → error on the email field.                              |
 | Validation error          | 400 with `details[]` → mapped onto the matching form fields by `path`.              |
 | Rate limited              | 429 `RATE_LIMITED` → toast "Too many attempts. Please wait a moment and try again." |
 | Success                   | Cookies written by the proxy → redirect to the role home.                           |
+
+> **`form.watch()` is banned.** The React Compiler cannot memoise it safely (`react-hooks/incompatible-library`). Use `useWatch({ control, name })` for a live field value.
 
 ### 6.2 Feature: `submissions` (Student Portal)
 
@@ -1237,12 +1280,23 @@ Each outlet is a branch (`feat/<area>-<short-title>`) and ends with a working, d
 
 ### Outlet 3 — Feature: `auth`
 
-- [ ] `features/auth/{schemas,keys,api,types}.ts`
-- [ ] `features/auth/components/login-form.tsx`, `signup-form.tsx`
-- [ ] `features/auth/hooks/use-login.ts`, `use-signup.ts`
-- [ ] `app/(auth)/login/page.tsx`, `app/(auth)/signup/page.tsx`
-- [ ] `components/shared/app-shell.tsx` with the user menu and logout
-- [ ] Smoke: signup → cookies written → redirect to `/student/dashboard`; login → redirect to the role home; invalid credentials → 401 toast; duplicate email → 409 inline; logout → cookies cleared → `/login`
+- [x] `features/auth/{schemas,keys,api,roles,form-error}.ts`
+- [x] `features/auth/components/login-form.tsx`, `signup-form.tsx`, `user-menu.tsx`
+- [x] `features/auth/hooks/use-login.ts`, `use-signup.ts`, `use-logout.ts`
+- [x] `app/(auth)/layout.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/signup/page.tsx`
+- [x] `components/shared/app-shell.tsx` with the user menu and logout
+- [x] `components/shared/page-header.tsx`
+- [x] `providers/theme-provider.tsx` (next-themes) + `<Toaster>` (sonner) in the root layout
+- [x] `app/(student)/student/layout.tsx`, `app/(mentor)/mentor/layout.tsx` — persona shells
+- [x] Placeholder `student/dashboard` and `mentor/dashboard` pages, so the post-login redirect lands somewhere (replaced in Outlets 4/5)
+- [x] `/` is role-aware: signed in → `redirect(roleHome(role))`; signed out → the public landing page
+- [x] Smoke: signup → 201, cookies written, role `STUDENT`
+- [x] Smoke: duplicate email → 409 `EMAIL_ALREADY_EXISTS`
+- [x] Smoke: the student dashboard renders with the user's name and the role nav
+- [x] Smoke: a student is redirected away from `/mentor/**`; an admin is redirected away from `/student/**`
+- [x] Smoke: `/` redirects an admin to `/mentor/dashboard`; a signed-in user is bounced off `/login`
+- [x] Smoke: `?next=//evil.com` is rejected — no rendered link contains the hostile host
+- [x] Smoke: logout clears the cookies, and the next protected request redirects to `/login?next=…`
 
 ### Outlet 4 — Feature: `submissions` (Student Portal)
 

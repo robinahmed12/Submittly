@@ -55,10 +55,15 @@ export interface AuthUser {
   createdAt: string;
 }
 
-/** The auth response body. The client strips `token` before it reaches the browser. */
+/**
+ * The auth response the browser receives.
+ *
+ * The API returns `{ user, token }`, but the backend proxy strips the token
+ * and delivers it as the `submittly_token` httpOnly cookie — so the browser
+ * only ever sees the user.
+ */
 export interface AuthPayload {
   user: AuthUser;
-  token: string;
 }
 
 /**

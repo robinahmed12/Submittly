@@ -177,6 +177,8 @@ A folder gains a new top-level file only when it earns it. Four small files beat
 - **A failed submit never clears the form.** The user's input is the most expensive thing on the screen.
 - Disable the submit button while the mutation is pending, and show a spinner. Never allow double submits.
 - Every input has a `<FieldLabel>` bound with `htmlFor`, and every error has `aria-describedby` pointing at the message.
+- **`form.watch()` is banned.** The React Compiler cannot memoise it safely (`react-hooks/incompatible-library` fires). Use `useWatch({ control, name })` for a live field value.
+- A failed request maps onto the form through the feature's error helper — `applyAuthError` for auth — never by hand-rolling `setError` calls in each component.
 
 ---
 
@@ -348,7 +350,7 @@ import { createSubmissionSchema } from './schemas';
 ```
 features/* → { lib/*, components/shared/*, types/* }     allowed
 features/A → features/B                                   forbidden
-components/shared → features/*                            forbidden
+components/shared → features/*                            forbidden — except features/auth
 components/ui → features/*                                forbidden
 app/(student) → features/mentor                           forbidden
 app/(mentor)  → features/student                          forbidden
@@ -356,8 +358,8 @@ app/(mentor)  → features/student                          forbidden
 
 - **Cross-feature imports are forbidden.** If two features need the same code, it belongs in `lib/` or `components/shared/`.
 - **Persona boundaries are as hard as feature boundaries.** The mentor shell never imports a student component, and vice versa.
-- Shared code imports nothing from `features/*`.
-- `src/lib/session.ts` is `import 'server-only'` — it must never be pulled into a client bundle.
+- **Shared code imports nothing from `features/*` — with one exception: `features/auth`.** The auth feature is cross-cutting: every persona has an account, and the app shell shows the signed-in user. Persona features (`submissions`, `review`) stay off-limits to shared code. If a shared component needs a persona-specific piece, it belongs in a persona folder instead.
+- `src/lib/session-server.ts` is `import 'server-only'` — it must never be pulled into a client bundle. `src/lib/session.ts` is framework-free and safe to import anywhere.
 
 ---
 
@@ -483,7 +485,8 @@ STATES      every view: loading · empty · error · success
 STYLE       semantic tokens (bg-background); no raw colours; cn() to merge
 A11Y        real labels · semantic HTML · visible focus · no colour-only meaning
 IMPORTS     external → @/internal → relative; type-only inline
-BOUNDARY    features/A → features/B forbidden; student ⇄ mentor forbidden
+BOUNDARY    features/A → features/B forbidden; student ⇄ mentor forbidden;
+             shared code may use features/auth only
 NO          any · raw fetch · useEffect fetching · editing components/ui/* ·
              default exports (except page/layout) · hard-coded colours ·
              secrets in NEXT_PUBLIC_ vars

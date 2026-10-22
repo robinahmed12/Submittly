@@ -1,17 +1,28 @@
+import { redirect } from 'next/navigation';
+import { AppShell } from '@/components/shared/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { roleHome } from '@/features/auth/roles';
+import { getSession } from '@/lib/session-server';
+import Link from 'next/link';
 
 /**
  * Public landing page.
  *
- * Outlet 3 replaces this with a role-aware redirect: a signed-in visitor is
- * sent to their dashboard, a signed-out one sees the sign-in / sign-up links.
- * For now it states plainly what the app is and where the routes are going.
+ * A signed-in visitor is sent straight to their dashboard; a signed-out one
+ * gets the marketing card. The session is read server-side, so the redirect
+ * happens before the page is ever painted.
  */
-export default function Home() {
+export default async function Home() {
+  const session = await getSession();
+
+  if (session) {
+    redirect(roleHome(session.role));
+  }
+
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center px-6 py-16">
-      <div className="w-full max-w-2xl space-y-8">
+    <AppShell session={null}>
+      <div className="mx-auto max-w-2xl space-y-8 py-8">
         <div className="space-y-3 text-center">
           <h1 className="text-4xl font-semibold tracking-tight">Submittly</h1>
           <p className="text-muted-foreground text-lg">
@@ -21,40 +32,22 @@ export default function Home() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Not wired up yet</CardTitle>
+            <CardTitle>Get started</CardTitle>
             <CardDescription>
-              The scaffold is in place. The following routes arrive in the implementation outlets.
+              Students submit projects and track their review status. Mentors review submissions
+              from a dashboard.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="text-muted-foreground space-y-2 text-sm">
-              <li>
-                <span className="text-foreground font-medium">/login</span> — sign in (Outlet 3)
-              </li>
-              <li>
-                <span className="text-foreground font-medium">/signup</span> — student registration
-                (Outlet 3)
-              </li>
-              <li>
-                <span className="text-foreground font-medium">/student/dashboard</span> — my
-                submissions (Outlet 4)
-              </li>
-              <li>
-                <span className="text-foreground font-medium">/mentor/dashboard</span> — review
-                statistics (Outlet 5)
-              </li>
-              <li>
-                <span className="text-foreground font-medium">/mentor/submissions</span> — review
-                queue (Outlet 5)
-              </li>
-            </ul>
-
-            <Button className="w-full" disabled>
-              Sign in — available from Outlet 3
+          <CardContent className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild className="flex-1">
+              <Link href="/signup">Create an account</Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1">
+              <Link href="/login">Sign in</Link>
             </Button>
           </CardContent>
         </Card>
       </div>
-    </main>
+    </AppShell>
   );
 }
