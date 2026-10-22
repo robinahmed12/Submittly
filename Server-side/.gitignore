@@ -16,3 +16,5 @@ src/generated/
 # Logs & misc
 *.log
 npm-debug.log*
+
+.vercel
