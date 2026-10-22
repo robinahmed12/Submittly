@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const httpUrlSchema = z
   .url('Please provide a valid URL')
-  .refine((url) => /^https?:\/\//i.test(url), 'URL must start with http:// or https://');
+  .refine(url => /^https?:\/\//i.test(url), 'URL must start with http:// or https://');
 
 /**
  * Create a submission — the documented duplicate rule lives on the server:
@@ -15,11 +15,7 @@ export const createSubmissionSchema = z.object({
     .min(3, 'Project name must be at least 3 characters')
     .max(120, 'Project name must be at most 120 characters'),
   repoUrl: z.string().trim().pipe(httpUrlSchema),
-  liveUrl: z
-    .string()
-    .trim()
-    .pipe(httpUrlSchema)
-    .optional(),
+  liveUrl: z.string().trim().pipe(httpUrlSchema).optional(),
   description: z
     .string()
     .trim()

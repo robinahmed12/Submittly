@@ -83,6 +83,7 @@ This guide is **binding for every PR or commit**. Prettier and ESLint enforce me
 ## 4. Validation Boundaries
 
 - Zod validates at the **first entry point** of user-controlled data: `validate({ body?, query?, params? })` middleware wraps schemas before a controller runs.
+- **Express 5 gotcha:** `req.query` is a getter-only property. Middleware that replaces request values must use `Object.defineProperty(req, key, { value, writable: true, configurable: true })` — a plain assignment throws `TypeError: Cannot set property query`.
 - After the middleware, controllers may re-`parse` for static types (as above) — this is not duplicate runtime work, it is type-bearing and zero cost at runtime.
 - Types for HTTP inputs come exclusively from `z.infer`; no parallel hand-written shape that can drift.
 - Never trust `req.body`/`req.query` types without Zod having parsed them.

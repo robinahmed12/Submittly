@@ -34,10 +34,15 @@ export function validate(schemas: ValidationSchemas): RequestHandler {
         continue;
       }
 
-      // Express types model the *raw* parsed values; Zod has fully replaced
-      // them, so the write goes through a structural cast (style: no `any`).
-      const writable = req as unknown as Record<(typeof TARGET_KEYS)[number], unknown>;
-      writable[key] = result.data;
+      // Express 5 exposes `req.query` as a getter-only property, so the parsed
+      // value is installed as an own property instead of a plain assignment.
+      // The cast is structural (style: no `any`); the schema owns the shape.
+      Object.defineProperty(req, key, {
+        value: result.data,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
     }
 
     if (details.length > 0) {

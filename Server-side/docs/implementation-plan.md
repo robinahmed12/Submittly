@@ -287,18 +287,19 @@ Schema decisions:
 
 Single point that reads `process.env`, validates it with Zod at startup, and exports a typed `env`. Fails fast at boot for missing required variables.
 
-| Variable                         | Required                   | Purpose                                            |
-| -------------------------------- | -------------------------- | -------------------------------------------------- |
-| `DATABASE_URL`                   | yes                        | PostgreSQL connection string                       |
-| `PORT`                           | no (default 4000)          | HTTP listen port                                   |
-| `JWT_SECRET`                     | yes                        | HMAC secret, ≥ 32 chars enforced in code           |
-| `JWT_EXPIRES_IN`                 | no (default `7d`)          | Access-token TTL                                   |
-| `BCRYPT_SALT_ROUNDS`             | no (default 12)            | Hash cost                                          |
-| `CORS_ORIGIN`                    | yes                        | Exact allowed origin, e.g. `http://localhost:3000` |
-| `RATE_LIMIT_AUTH_MAX`            | no (default 10)            | Login/signup attempts per window                   |
-| `RATE_LIMIT_SUBMIT_MAX`          | no (default 5)             | Submissions per window                             |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seed only                  | Credentials for the seeded admin                   |
-| `NODE_ENV`                       | no (default `development`) |                                                    |
+| Variable                           | Required                   | Purpose                                            |
+| ---------------------------------- | -------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                     | yes                        | PostgreSQL connection string                       |
+| `PORT`                             | no (default 4000)          | HTTP listen port                                   |
+| `JWT_SECRET`                       | yes                        | HMAC secret, ≥ 32 chars enforced in code           |
+| `JWT_EXPIRES_IN`                   | no (default `7d`)          | Access-token TTL                                   |
+| `BCRYPT_SALT_ROUNDS`               | no (default 12)            | Hash cost                                          |
+| `CORS_ORIGIN`                      | yes                        | Exact allowed origin, e.g. `http://localhost:3000` |
+| `RATE_LIMIT_AUTH_MAX`              | no (default 10)            | Login/signup attempts per window                   |
+| `RATE_LIMIT_SUBMIT_MAX`            | no (default 5)             | Submissions per window                             |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD`   | seed only                  | Credentials for the seeded admin                   |
+| `MENTOR_EMAIL` / `MENTOR_PASSWORD` | seed only (optional)       | Credentials for a seeded mentor (dashboard demo)   |
+| `NODE_ENV`                         | no (default `development`) |                                                    |
 
 ### 5.2 `db/prisma.ts`
 
@@ -348,14 +349,14 @@ Every service failure that the client should see is `throw new ApiError(...)`; t
 
 ### 5.4 Middlewares (precise contracts)
 
-| Middleware                             | Contract                                                                                                                                                                                                         |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authenticate`                         | Expects `Authorization: Bearer <token>`. Verifies **signature and expiry**; attaches `req.user = { id, role }`. 401 on missing/invalid/expired token.                                                            |
-| `authorize(...roles: Role[])`          | After `authenticate`; 403 unless `req.user.role ∈ roles`.                                                                                                                                                        |
-| `validate({ body?, query?, params? })` | Parses with Zod, **strips unknown keys**, replaces `req.body/query/params` with parsed values. On failure → 400 with `details: [{ path, message }]`. Pagination schemas use `z.coerce` for numeric query params. |
-| `rate-limiter`                         | Named factory instances: `globalLimiter` (app-wide, generous), `authLimiter` (login/signup), `submitLimiter` (submission creation). Keyed by IP or authenticated `user.id` when present.                         |
-| `error-handler`                        | Renders `ApiError`; safety-maps `ZodError → 400` and Prisma `P2002 → 409` (defense in depth); anything else → 500 `INTERNAL` with a generic message (details logged server-side only).                           |
-| `not-found`                            | Unmatched `/api/**` → 404 envelope.                                                                                                                                                                              |
+| Middleware                             | Contract                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authenticate`                         | Expects `Authorization: Bearer <token>`. Verifies **signature and expiry**; attaches `req.user = { id, role }`. 401 on missing/invalid/expired token.                                                                                                                                                                                                                                                     |
+| `authorize(...roles: Role[])`          | After `authenticate`; 403 unless `req.user.role ∈ roles`.                                                                                                                                                                                                                                                                                                                                                 |
+| `validate({ body?, query?, params? })` | Parses with Zod, **strips unknown keys**, and installs the parsed values onto the request. On failure → 400 with `details: [{ path, message }]`. Pagination schemas use `z.coerce` for numeric query params. **Express 5 note:** `req.query` is a getter-only property, so the parsed value is installed with `Object.defineProperty` (a plain assignment throws `TypeError: Cannot set property query`). |
+| `rate-limiter`                         | Named factory instances: `globalLimiter` (app-wide, generous), `authLimiter` (login/signup), `submitLimiter` (submission creation). Keyed by IP or authenticated `user.id` when present.                                                                                                                                                                                                                  |
+| `error-handler`                        | Renders `ApiError`; safety-maps `ZodError → 400` and Prisma `P2002 → 409` (defense in depth); anything else → 500 `INTERNAL` with a generic message (details logged server-side only).                                                                                                                                                                                                                    |
+| `not-found`                            | Unmatched `/api/**` → 404 envelope.                                                                                                                                                                                                                                                                                                                                                                       |
 
 ### 5.5 `types/express.d.ts`
 
@@ -636,17 +637,18 @@ router.post(
 
 ### Outlet 4 — Feature: `submissions`
 
-- [ ] `submission.schema.ts`; `repo-url.ts` normalization
-- [ ] `submission.service.ts` (create with 409 P2002 mapping; list via `req.user.id`)
-- [ ] Routes wired `authenticate → authorize('STUDENT') → submitLimiter → validate`
-- [ ] Smoke: create → 201; duplicate → 409; mentor token on route → 403
+- [x] `submission.schema.ts`; `repo-url.ts` normalization
+- [x] `submission.service.ts` (create with 409 P2002 mapping; list via `req.user.id`)
+- [x] Routes wired `authenticate → authorize('STUDENT') → submitLimiter → validate`
+- [x] Smoke: create → 201, duplicate repo (same student) → 409, same repo for a different student → 201, invalid payload → 400, `/me` → 200 (own rows only), no token → 401, bad token → 401, mentor/admin token → 403
 
 ### Outlet 5 — Feature: `review`
 
-- [ ] `review.schema.ts` (list query, status patch)
-- [ ] `review.service.ts` (paginated server-filtered list, 422-barred transitions, transactional update + comment, `GROUP BY` stats)
-- [ ] Routes wired `authenticate → authorize('MENTOR','ADMIN') → validate`
-- [ ] Smoke: filter + page flags; approve one submission; stats reflect it
+- [x] `review.schema.ts` (list query, status patch)
+- [x] `review.service.ts` (paginated server-filtered list, 422-barred transitions, transactional update + comment, `GROUP BY` stats)
+- [x] Routes wired `authenticate → authorize('MENTOR','ADMIN') → validate`
+- [x] Smoke: list → 200 with `student` info, `status` filter → 200, `page`/`limit` → 200 with `totalPages`, invalid filter → 400, student token → 403, unknown id → 404, approve → 200, re-approve → 422, reject → 200, stats reflect the reviews
+- [x] Seeded MENTOR account (optional `MENTOR_EMAIL` / `MENTOR_PASSWORD`) so the dashboard is demoable
 
 ### Outlet 6 — Hardening, seeding & clean-up
 

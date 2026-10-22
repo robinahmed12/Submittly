@@ -1,5 +1,6 @@
-// Seeds the ADMIN account (Users §3: "an admin account may be seeded directly
-// in the database"). Credentials come from env; run via `npm run prisma:seed`.
+// Seeds the ADMIN and (optional) MENTOR accounts
+// (Users §3: "an admin account may be seeded directly in the database").
+// Credentials come from env; run via `npm run prisma:seed`.
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { env } from '../src/config/env';
@@ -8,24 +9,44 @@ import { hashPassword } from '../src/lib/password';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) });
 
-async function main(): Promise<void> {
-  const email = env.ADMIN_EMAIL?.trim().toLowerCase();
-  const password = env.ADMIN_PASSWORD;
-
-  if (!email || !password) {
-    throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env before seeding.');
+async function seedAccount(input: {
+  name: string;
+  email: string | undefined;
+  password: string | undefined;
+  role: 'ADMIN' | 'MENTOR';
+}): Promise<void> {
+  const email = input.email?.trim().toLowerCase();
+  if (!email || !input.password) {
+    console.log(`Skipped ${input.role} seed: no credentials configured.`);
+    return;
   }
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(input.password);
 
-  // Update intentionally empty: never clobber an existing admin password.
+  // Update intentionally empty: never clobber an existing account's password.
   await prisma.user.upsert({
     where: { email },
     update: {},
-    create: { name: 'Submittly Admin', email, passwordHash, role: 'ADMIN' },
+    create: { name: input.name, email, passwordHash, role: input.role },
   });
 
-  console.log(`Seeded admin ready: ${email}`);
+  console.log(`Seeded ${input.role} ready: ${email}`);
+}
+
+async function main(): Promise<void> {
+  await seedAccount({
+    name: 'Submittly Admin',
+    email: env.ADMIN_EMAIL,
+    password: env.ADMIN_PASSWORD,
+    role: 'ADMIN',
+  });
+
+  await seedAccount({
+    name: 'Submittly Mentor',
+    email: env.MENTOR_EMAIL,
+    password: env.MENTOR_PASSWORD,
+    role: 'MENTOR',
+  });
 }
 
 void main()

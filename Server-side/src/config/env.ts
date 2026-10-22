@@ -23,6 +23,8 @@ const envSchema = z.object({
   // Seed-only variables (`npm run prisma:seed`); not required by the API itself.
   ADMIN_EMAIL: z.email().optional(),
   ADMIN_PASSWORD: z.string().optional(),
+  MENTOR_EMAIL: z.email().optional(),
+  MENTOR_PASSWORD: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
